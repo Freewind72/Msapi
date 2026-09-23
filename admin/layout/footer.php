@@ -15,7 +15,7 @@
 <?php $device = $isMobile ? 'mobile' : 'pc'; ?>
 <script src="<?= str_replace('{device}', $device, $RELAY['page']['base_js']) ?>"></script>
 <?php $pageJsKey = $action . '_js'; if (isset($RELAY['page'][$pageJsKey])): ?>
-<script src="<?= str_replace('{device}', $device, $RELAY['page'][$pageJsKey]) ?>"></script>
+<script id="page-js" src="<?= str_replace('{device}', $device, $RELAY['page'][$pageJsKey]) ?>"></script>
 <?php endif; ?>
 </body>
 </html>

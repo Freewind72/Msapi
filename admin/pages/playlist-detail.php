@@ -49,7 +49,7 @@ $pId = $cfg['api']['param_id'] ?? 'id';
 $rServer = $cfg['api']['param_server'] ?? 'server';
 $rType = $cfg['api']['param_type'] ?? 'type';
 ?>
-<div class="card">
+<div class="card" data-api-key="<?= htmlspecialchars($pl['api_key'] ?? '') ?>">
   <div class="card-header">
     <a href="?action=config" class="btn-sm" style="margin-right:8px">&larr;</a>
     <span class="card-title"><?= htmlspecialchars($pl['name']) ?></span>
@@ -62,7 +62,8 @@ $rType = $cfg['api']['param_type'] ?? 'type';
 
   <div class="key-card-info" style="margin-bottom:12px">
     <span class="key-card-user"><?= htmlspecialchars($pl['username'] ?? '-') ?></span>
-    <code class="key-card-code"><?= htmlspecialchars($pl['api_key'] ?? '') ?></code>
+    <code class="key-card-code"><?= htmlspecialchars(mask_key($pl['api_key'] ?? '')) ?></code>
+    <button class="btn-copy" onclick="var k=this.closest('.card').dataset.apiKey;navigator.clipboard.writeText(k);var org=this.innerHTML;this.innerHTML='<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><polyline points=&quot;20 6 9 17 4 12&quot;/></svg>';setTimeout(function(){this.innerHTML=org},1500)"><?= svg('copy') ?></button>
     <?php if (!$isRemote): ?>
     <button type="button" class="btn-sm" id="openEditPlBtn" style="margin-left:auto;font-size:10px;padding:3px 10px">编辑</button>
     <?php endif; ?>
