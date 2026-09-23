@@ -1,0 +1,12 @@
+.user-item{display:flex;flex-direction:column;gap:10px;padding:14px;background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.5);border-radius:14px}
+.user-avatar{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:rgba(0,0,0,.4);flex-shrink:0;overflow:hidden}
+.user-avatar img{width:40px;height:40px;display:block}
+.user-info{min-width:0}
+.user-name{font-size:13px;font-weight:600;color:rgba(0,0,0,.6);display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.user-meta{display:flex;gap:10px;font-size:10px;color:rgba(0,0,0,.3);flex-wrap:wrap}
+.user-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+[data-theme="dark"] .user-item{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.06)}
+[data-theme="dark"] .user-avatar{background:rgba(255,255,255,.08);color:rgba(255,255,255,.4)}
+[data-theme="dark"] .user-name{color:rgba(255,255,255,.6)}
+[data-theme="dark"] .user-meta{color:rgba(255,255,255,.3)}

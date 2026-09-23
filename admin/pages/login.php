@@ -269,14 +269,16 @@ function get_mail_template(string $code): array {
 EOT;
     $html = true;
     if ($db && !$db->connect_error) {
-        $r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='mail_template'");
-        if ($r && $row = $r->fetch_assoc()) {
-            $tpl = json_decode($row['config_value'], true);
-            if (is_array($tpl)) {
-                if (!empty($tpl['subject'])) $subject = $tpl['subject'];
-                if (!empty($tpl['body'])) $body = $tpl['body'];
-                $html = !empty($tpl['html']);
-            }
+        if (!defined('DB_SQLITE')) {
+            $db->query("CREATE TABLE IF NOT EXISTS `mapi_mail_templates` (`id` INT NOT NULL AUTO_INCREMENT, `name` VARCHAR(100) NOT NULL DEFAULT '', `subject` VARCHAR(200) NOT NULL DEFAULT '顺雅音乐 - 验证码邮件', `body` TEXT, `is_html` TINYINT NOT NULL DEFAULT 0, `is_default` TINYINT NOT NULL DEFAULT 0, `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP, `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } else {
+            $db->query("CREATE TABLE IF NOT EXISTS mapi_mail_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) NOT NULL DEFAULT '', subject VARCHAR(200) NOT NULL DEFAULT '顺雅音乐 - 验证码邮件', body TEXT, is_html INTEGER NOT NULL DEFAULT 0, is_default INTEGER NOT NULL DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+        }
+        $r = $db->query("SELECT * FROM mapi_mail_templates WHERE is_default=1 LIMIT 1");
+        if ($r && ($row2 = $r->fetch_assoc())) {
+            if (!empty($row2['subject'])) $subject = $row2['subject'];
+            if (!empty($row2['body'])) $body = $row2['body'];
+            $html = !empty($row2['is_html']);
         }
     }
     return [
@@ -461,33 +463,13 @@ if ($r && $row = $r->fetch_assoc()) {
 }
 ?><!DOCTYPE html>
 <html lang="zh-CN">
-<head><style>*{scrollbar-width:none}*::-webkit-scrollbar{display:none}.fl{position:relative}.fl input[name=username]{padding-right:40px}.fl .avatar{position:absolute;right:8px;top:29px;width:28px;height:28px;border-radius:50%;object-fit:cover;pointer-events:none;z-index:1}.push-panel,.glass{background:rgba(255,255,255,.88)!important}html,body{background:#eef0f4;min-height:100vh}body[data-theme="dark"]{background-color:#1a1a2e!important;color:#ccc}body[data-theme="dark"] .push-panel,body[data-theme="dark"] .glass{background:rgba(40,40,55,.85)!important;border-color:rgba(255,255,255,.06)!important}body[data-theme="dark"] .push-tab .tab-body{fill:rgba(55,55,68,.85)!important}body[data-theme="dark"] .push-tab .tab-shadow{fill:rgba(0,0,0,.15)!important}body[data-theme="dark"] .push-tab .tab-arrow{stroke:rgba(255,255,255,.4)!important}body[data-theme="dark"] .tab{color:rgba(255,255,255,.4)!important}body[data-theme="dark"] .tab.act{color:#e0e0e8!important}body[data-theme="dark"] h1{color:#e0e0e8}body[data-theme="dark"] .sub{color:rgba(255,255,255,.35)}body[data-theme="dark"] .fl label{color:rgba(255,255,255,.38)}body[data-theme="dark"] input{background:rgba(255,255,255,.04)!important;border-color:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.6)!important}body[data-theme="dark"] .btn{background:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.55)!important;border-color:rgba(255,255,255,.06)!important}body[data-theme="dark"] .btn-outline{background:rgba(255,255,255,.04)!important}</style>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>顺雅 · 登录</title>
 <script>var GEETEST_CAPTCHA_ID = '<?= addslashes($geetestCaptchaId) ?>';</script>
 <script src="<?= $RELAY['sdk']['geetest_js'] ?>"></script>
 <link rel="stylesheet" href="<?= str_replace('{device}', $isMobile ? 'mobile' : 'pc', $RELAY['page']['login_css']) ?>">
-<style>
-*,*::before,*::after{-webkit-tap-highlight-color:transparent}
-body{min-height:100vh}
-.push-panel,.glass{background:rgba(255,255,255,.03)!important;backdrop-filter:blur(24px) saturate(200%)!important;-webkit-backdrop-filter:blur(24px) saturate(200%)!important;border:1px solid rgba(255,255,255,.06)!important}
-.push-tab .tab-body{fill:rgba(255,255,255,.03)!important}
-.push-tab .tab-shadow{fill:rgba(0,0,0,.15)!important}
-.push-tab .tab-arrow{stroke:rgba(255,255,255,.4)!important}
-h1{font-style:italic!important;color:rgba(255,255,255,.8)!important;font-weight:400!important}
-.sub{color:rgba(255,255,255,.3)!important}
-.fl label{color:rgba(255,255,255,.38)!important}
-input{background:rgba(255,255,255,.04)!important;border-color:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.6)!important;border-radius:12px!important;padding:12px 16px!important}
-.btn{background:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.7)!important;border-color:rgba(255,255,255,.06)!important;border-radius:9999px!important;padding:10px 22px!important;font-size:14px!important;font-weight:500!important}
-.btn-outline{background:transparent!important}
-.btn:hover{background:rgba(255,255,255,.1)!important;color:rgba(255,255,255,.9)!important}
-.tab{color:rgba(255,255,255,.35)!important}
-.tab.act{color:rgba(255,255,255,.8)!important;background:rgba(255,255,255,.06)!important}
-body[data-theme="dark"]{background-color:#0a0a0f!important}
-body[data-theme="dark"] h1,.push-panel h1{color:rgba(255,255,255,.8)!important}
-</style>
 </head>
-<body data-device="<?= $isMobile ? 'mobile' : 'pc' ?>" data-theme="<?= $loginTheme ?>" style="background:<?= $loginBg ? "url($loginBg) center/cover no-repeat fixed" : '#eef0f4' ?>;min-height:100vh">
+<body data-device="<?= $isMobile ? 'mobile' : 'pc' ?>" data-theme="<?= $loginTheme ?>" style="background:<?= $loginBg ? "url($loginBg) center/cover no-repeat fixed" : '' ?>">
 
 <!-- ═══ PC 端：推压式面板 ═══ -->
 <div class="push-container" id="pushContainer">
@@ -573,6 +555,6 @@ body[data-theme="dark"] h1,.push-panel h1{color:rgba(255,255,255,.8)!important}
 </div>
 
 <div id="toast"></div>
-<script src="<?= $RELAY['page']['login_js'] ?>"></script>
+<script src="<?= str_replace('{device}', $isMobile ? 'mobile' : 'pc', $RELAY['page']['login_js']) ?>"></script>
 </body>
 </html>

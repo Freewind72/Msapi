@@ -1,0 +1,6 @@
+.inline-form{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.04)}
+.inline-form:last-child{border-bottom:none}
+.form-row{display:flex;align-items:center;gap:8px;width:100%}
+.form-row .form-input{flex:1;min-width:0;padding:7px 10px;font-size:12px}
+
+[data-theme="dark"] .inline-form{border-bottom-color:rgba(255,255,255,.04)}

@@ -1,13 +1,19 @@
 <?php defined('MAPI_ADMIN') or die('禁止直接访问');
 require __DIR__ . '/../api/relay.php';
 // users.php — 人员管理（仅管理员）
+
+// 用户列表
+$users = [];
+$r = $db->query("SELECT id,username,qq,is_admin,expire_at,created_at FROM mapi_users WHERE id<>" . (int)$_SESSION['admin_id'] . " ORDER BY id");
+if ($r) while ($row = $r->fetch_assoc()) $users[] = $row;
+
 if ((($_SESSION['admin_is_admin'] ?? 99) > 1)) { echo '<div class="card"><div class="empty">无权限</div></div>'; return; }
 ?>
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('user') ?> 人员管理</span></div>
   <?php if (empty($users)): ?><div class="empty">暂无用户</div>
   <?php else: ?>
-  <div class="data-grid">
+  <div class="data-grid data-grid-2">
   <?php foreach ($users as $u): ?>
   <div class="user-item">
     <div class="user-avatar"><?php if ($u['qq'] ?? ''): ?><img src="<?= $RELAY['avatar']['qq'] ?>?b=qq&nk=<?= (int)$u['qq'] ?>&s=100" alt=""><?php else: ?><?= htmlspecialchars(mb_substr($u['username'],0,1,'UTF-8')) ?><?php endif; ?></div>

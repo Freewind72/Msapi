@@ -31,16 +31,19 @@ function get_table_definitions(string $type): array {
 
 function stream_line(string $msg, int $delay = 100000): void {
     echo json_encode(['line' => $msg], JSON_UNESCAPED_UNICODE) . "\n";
+    if (ob_get_level()) ob_flush();
     flush();
     usleep($delay);
 }
 
 function stream_done(): void {
     echo json_encode(['done' => true]) . "\n";
+    if (ob_get_level()) ob_flush();
     flush();
 }
 
 function stream_error(string $msg): void {
     echo json_encode(['error' => $msg], JSON_UNESCAPED_UNICODE) . "\n";
+    if (ob_get_level()) ob_flush();
     flush();
 }

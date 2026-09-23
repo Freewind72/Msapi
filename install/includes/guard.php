@@ -21,10 +21,10 @@ if (file_exists($configFile) && file_exists($lockFile)) {
         $lines[trim($key)] = trim($val);
     }
 
-    $actualHash = hash_file('sha256', $configFile);
-
-    $hashOk      = isset($lines['config_hash']) && $lines['config_hash'] === $actualHash;
-    $signatureOk = isset($lines['signature'])   && $lines['signature']   === 'msapi';
+    $sha256File = $installDir . '/assets/sha256';
+    $expectHash = file_exists($sha256File) ? trim(file_get_contents($sha256File)) : '';
+    $hashOk      = $expectHash !== '' && $expectHash === hash_file('sha256', $lockFile);
+    $signatureOk = isset($lines['signature']) && $lines['signature'] === 'msapi';
 
     if ($hashOk && $signatureOk) {
         header('Location: ../');

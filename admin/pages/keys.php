@@ -1,5 +1,24 @@
 <?php defined('MAPI_ADMIN') or die('禁止直接访问');
 // keys.php — 密钥管理
+
+// 密钥列表（含用户信息）
+$keys = [];
+if (($_SESSION['admin_is_admin'] ?? 99) === 0) {
+    $r = $db->query("SELECT k.*, u.username FROM mapi_keys k LEFT JOIN mapi_users u ON k.user_id=u.id ORDER BY k.id DESC");
+} else {
+    $r = $db->query("SELECT k.*, u.username FROM mapi_keys k LEFT JOIN mapi_users u ON k.user_id=u.id WHERE k.user_id=" . (int)$_SESSION['admin_id'] . " ORDER BY k.id DESC");
+}
+if ($r) while ($row = $r->fetch_assoc()) $keys[] = $row;
+
+// 歌单分组数据
+$playlistsByKey = [];
+$r = $db->query("SELECT id, key_id, name, type, remote_id, server, cover_url, cover_mode, sort_order FROM mapi_playlists ORDER BY sort_order ASC, id ASC");
+if ($r) while ($row = $r->fetch_assoc()) {
+    $kid = (int)$row['key_id'];
+    if (!isset($playlistsByKey[$kid])) $playlistsByKey[$kid] = [];
+    $playlistsByKey[$kid][] = $row;
+}
+
 $isAdmin = $_SESSION['admin_is_admin'] ?? 99;
 $keyCount = count($keys);
 
@@ -23,7 +42,7 @@ if ($isAdmin > 1) {
 <?php if ($isAdmin > 1 && !$isActive && $keyCount > 0): ?>
 <div class="card" style="border:1px solid rgba(231,76,60,.3);background:rgba(231,76,60,.08);margin-bottom:12px">
   <div style="padding:12px 16px;color:#e74c3c;font-weight:600;display:flex;align-items:center;gap:8px">
-    <?= svg('alert') ?> 您的账户<?= $expireAt ? '已于 ' . htmlspecialchars($expireAt) . ' 过期' : '尚未激活' ?>，现有密钥已被拦截，请前往 <a href="?action=shop" style="color:#e74c3c;text-decoration:underline">商店</a> 激活账户
+    <?= svg('alert') ?> 您的账户<?= $expireAt ? '已于 ' . htmlspecialchars($expireAt) . ' 过期' : '尚未激活' ?>，现有密钥已被拦截
   </div>
 </div>
 <?php endif; ?>
@@ -39,7 +58,7 @@ if ($isAdmin > 1) {
   </div>
   <?php if (empty($keys)): ?><div class="empty">暂无密钥，点击右上角创建</div>
   <?php else: ?>
-  <div class="data-grid">
+  <div class="data-grid data-grid-2">
   <?php foreach ($keys as $key): ?>
   <div class="data-item" data-api-key="<?= htmlspecialchars($key['api_key']) ?>">
     <div class="data-body">

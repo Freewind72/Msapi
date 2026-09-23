@@ -68,6 +68,18 @@ CREATE TABLE IF NOT EXISTS mapi_products (
     sort_order INTEGER DEFAULT 0
 );
 
+-- mapi_mail_templates
+CREATE TABLE IF NOT EXISTS mapi_mail_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL DEFAULT '',
+    subject VARCHAR(200) NOT NULL DEFAULT '顺雅音乐 - 验证码邮件',
+    body TEXT,
+    is_html INTEGER NOT NULL DEFAULT 0,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- mapi_tokens
 CREATE TABLE IF NOT EXISTS mapi_tokens (
     token VARCHAR(80) PRIMARY KEY,

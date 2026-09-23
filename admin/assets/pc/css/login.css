@@ -1,15 +1,21 @@
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:linear-gradient(135deg,#e8eaf0 0%,#dde0e8 30%,#eef0f4 60%,#e2e5ed 100%);color:#1a1a2e;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;scrollbar-width:none}
+*::-webkit-scrollbar{display:none}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef0f4;color:#1a1a2e;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;overscroll-behavior:none;padding:20px}
 .glass{background:rgba(255,255,255,.5);backdrop-filter:blur(24px)saturate(200%);border:1px solid rgba(255,255,255,.65);border-radius:16px}
 
 .login-mobile{display:none}
+
+.fl{position:relative}
+.fl input[name=username]{padding-right:40px}
+.fl .avatar{position:absolute;right:8px;top:29px;width:28px;height:28px;border-radius:50%;object-fit:cover;pointer-events:none;z-index:1}
 
 /* ═══ 推压式面板 ═══ */
 .push-container{display:block;position:relative;width:540px;height:600px;overflow:hidden;border-radius:24px;box-shadow:0 32px 100px rgba(0,0,0,.10),0 12px 32px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.03)}
 .push-panel{position:absolute;top:0;width:540px;height:100%;display:flex;align-items:center;justify-content:center;transition:left .6s cubic-bezier(.25,.1,.25,1);border:1px solid rgba(255,255,255,.7)}
 .push-login{left:0;z-index:2;background:rgba(255,255,255,.60);border-radius:24px 0 0 24px}
 .push-login.pushed{left:-540px;z-index:1}
-.push-register{left:540px;z-index:1;background:rgba(255,255,255,.45);border-radius:0 24px 24px 0;overflow-y:auto}
+.push-register{left:540px;z-index:1;background:rgba(255,255,255,.45);border-radius:0 24px 24px 0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+.push-register::-webkit-scrollbar{display:none}
 .push-register.pushed{left:0;z-index:2}
 
 .push-panel-inner{width:380px;max-width:100%;padding:44px 40px;text-align:center}
@@ -58,5 +64,21 @@ body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;backgr
 #modalOverlay{display:none;position:fixed;z-index:999999;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center}
 #modalOverlay .modalBox{background:#fff;border-radius:12px;padding:28px 24px 20px;min-width:280px;max-width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.18)}
 #modalOverlay .modalBox p{margin:0 0 16px;font-size:14px;color:#333;line-height:1.6}
+
+/* ═══ 暗色主题 ═══ */
+body[data-theme="dark"]{background-color:#1a1a2e;color:#ccc}
+body[data-theme="dark"] .push-panel,
+body[data-theme="dark"] .glass{background:rgba(40,40,55,.85)!important;border-color:rgba(255,255,255,.06)!important}
+body[data-theme="dark"] .push-tab .tab-body{fill:rgba(55,55,68,.85)!important}
+body[data-theme="dark"] .push-tab .tab-shadow{fill:rgba(0,0,0,.15)!important}
+body[data-theme="dark"] .push-tab .tab-arrow{stroke:rgba(255,255,255,.4)!important}
+body[data-theme="dark"] .tab{color:rgba(255,255,255,.4)!important}
+body[data-theme="dark"] .tab.act{color:#e0e0e8!important}
+body[data-theme="dark"] h1{color:#e0e0e8}
+body[data-theme="dark"] .sub{color:rgba(255,255,255,.35)}
+body[data-theme="dark"] .fl label{color:rgba(255,255,255,.38)}
+body[data-theme="dark"] input{background:rgba(255,255,255,.04)!important;border-color:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.6)!important}
+body[data-theme="dark"] .btn{background:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.55)!important;border-color:rgba(255,255,255,.06)!important}
+body[data-theme="dark"] .btn-outline{background:rgba(255,255,255,.04)!important}
 body[data-theme="dark"] #modalOverlay .modalBox{background:#2a2a3e}
 body[data-theme="dark"] #modalOverlay .modalBox p{color:#ccc}

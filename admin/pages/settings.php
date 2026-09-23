@@ -26,12 +26,6 @@ if ($r && $row = $r->fetch_assoc()) {
     $saved = json_decode($row['config_value'], true);
     if (is_array($saved)) $s3 = array_merge($s3, $saved);
 }
-$epay = ['api_url'=>'','pid'=>'','key'=>''];
-$r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='epay'");
-if ($r && $row = $r->fetch_assoc()) {
-    $saved = json_decode($row['config_value'], true);
-    if (is_array($saved)) $epay = array_merge($epay, $saved);
-}
 $geetest = ['captcha_id' => '', 'key' => ''];
 $r = $db->query("SELECT captcha_id, `key` FROM mapi_geetest LIMIT 1");
 if ($r && $row = $r->fetch_assoc()) {
@@ -298,16 +292,37 @@ $mailTemplate = ['subject' => '顺雅音乐 - 验证码邮件', 'body' => <<<'EO
 </body>
 </html>
 EOT, 'html' => true];
-$r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='mail_template'");
-if ($r && $row = $r->fetch_assoc()) {
-    $saved = json_decode($row['config_value'], true);
-    if (is_array($saved)) $mailTemplate = array_merge($mailTemplate, $saved);
+// 邮件模板列表 — 从新表加载
+$mailTemplates = [];
+if (!defined('DB_SQLITE')) {
+    $db->query("CREATE TABLE IF NOT EXISTS `mapi_mail_templates` (`id` INT NOT NULL AUTO_INCREMENT, `name` VARCHAR(100) NOT NULL DEFAULT '', `subject` VARCHAR(200) NOT NULL DEFAULT '顺雅音乐 - 验证码邮件', `body` TEXT, `is_html` TINYINT NOT NULL DEFAULT 0, `is_default` TINYINT NOT NULL DEFAULT 0, `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP, `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+} else {
+    $db->query("CREATE TABLE IF NOT EXISTS mapi_mail_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) NOT NULL DEFAULT '', subject VARCHAR(200) NOT NULL DEFAULT '顺雅音乐 - 验证码邮件', body TEXT, is_html INTEGER NOT NULL DEFAULT 0, is_default INTEGER NOT NULL DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+}
+$rt = $db->query("SELECT * FROM mapi_mail_templates ORDER BY is_default DESC, id ASC");
+if ($rt) { while ($trow = $rt->fetch_assoc()) { $mailTemplates[] = $trow; } }
+// 表为空则从旧 config 迁移
+if (empty($mailTemplates)) {
+    $rold = $db->query("SELECT config_value FROM mapi_config WHERE config_key='mail_template'");
+    if ($rold && $oldrow = $rold->fetch_assoc()) {
+        $tpl = json_decode($oldrow['config_value'], true);
+        if (is_array($tpl)) {
+            $nm = trim($tpl['name'] ?? '') ?: '默认模板';
+            $sj = trim($tpl['subject'] ?? '') ?: '顺雅音乐 - 验证码邮件';
+            $bd = $tpl['body'] ?? '';
+            $ht = !empty($tpl['html']) ? 1 : 0;
+            $ins = $db->prepare("INSERT INTO mapi_mail_templates (name, subject, body, is_html, is_default) VALUES (?, ?, ?, ?, 1)");
+            if ($ins) { $ins->bind_param('sssi', $nm, $sj, $bd, $ht); $ins->execute(); }
+            $mailTemplates[] = ['id' => $db->insert_id, 'name' => $nm, 'subject' => $sj, 'body' => $bd, 'is_html' => $ht, 'is_default' => 1];
+        }
+    }
 }
 ?>
 
 <!-- ═══ 站点内容 ═══ -->
 <div class="section-header"><span class="section-header-inner"><?= svg('img') ?> 站点内容</span></div>
 
+<div class="cards-grid">
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('srv') ?> 公告</span></div>
   <form method="post" action="?action=settings"><input type="hidden" name="_ann_submit" value="1"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
@@ -329,19 +344,22 @@ if ($r && $row = $r->fetch_assoc()) {
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('img') ?> 登录页主题与背景</span></div>
   <form method="post" action="?action=settings"><input type="hidden" name="_login_submit" value="1"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-    <div class="form-group">
-      <label class="form-label">主题模式</label>
-      <select name="login_theme" class="form-input">
-        <option value="light" <?= $loginTheme === 'light' ? 'selected' : '' ?>>浅色</option>
-        <option value="dark" <?= $loginTheme === 'dark' ? 'selected' : '' ?>>深色</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">背景图片 URL</label>
-      <input class="form-input" name="login_bg" value="<?= htmlspecialchars($loginBg) ?>" placeholder="留空 = 默认浅灰背景">
+    <div class="form-row">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">主题模式</label>
+        <select name="login_theme" class="form-input">
+          <option value="light" <?= $loginTheme === 'light' ? 'selected' : '' ?>>浅色</option>
+          <option value="dark" <?= $loginTheme === 'dark' ? 'selected' : '' ?>>深色</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">背景图片 URL</label>
+        <input class="form-input" name="login_bg" value="<?= htmlspecialchars($loginBg) ?>" placeholder="留空 = 默认浅灰背景">
+      </div>
     </div>
     <button class="btn btn-primary btn-block">保存</button>
   </form>
+</div>
 </div>
 
 <!-- ═══ 安全 ═══ -->
@@ -350,15 +368,17 @@ if ($r && $row = $r->fetch_assoc()) {
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('srv') ?> 极验验证码</span></div>
   <form method="post" action="?action=settings"><input type="hidden" name="_geetest_submit" value="1"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-    <div class="form-group">
-      <label class="form-label">captcha_id（应用 ID）</label>
-      <input class="form-input" name="geetest_captcha_id" value="<?= htmlspecialchars($geetest['captcha_id']) ?>" placeholder="从极验后台获取的 captcha_id">
+    <div class="form-row">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">captcha_id（应用 ID）</label>
+        <input class="form-input" name="geetest_captcha_id" value="<?= htmlspecialchars($geetest['captcha_id']) ?>" placeholder="从极验后台获取的 captcha_id">
+      </div>
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">key（密钥）</label>
+        <input class="form-input" type="password" name="geetest_key" value="<?= htmlspecialchars($geetest['key']) ?>" placeholder="极验后台的验证密钥">
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">key（密钥）</label>
-      <input class="form-input" type="password" name="geetest_key" value="<?= htmlspecialchars($geetest['key']) ?>" placeholder="极验后台的验证密钥">
-    </div>
-    <small style="display:block;margin-top:-8px;margin-bottom:12px;color:rgba(0,0,0,.38);font-size:11px">留空则关闭极验验证码。修改后需刷新登录页生效。</small>
+    <small style="display:block;margin-top:6px;margin-bottom:12px;color:rgba(0,0,0,.38);font-size:11px">留空则关闭极验验证码。修改后需刷新登录页生效。</small>
     <button class="btn btn-primary btn-block">保存</button>
   </form>
 </div>
@@ -367,7 +387,8 @@ if ($r && $row = $r->fetch_assoc()) {
 <!-- ═══ 系统服务 ═══ -->
 <div class="section-header"><span class="section-header-inner"><?= svg('srv') ?> 系统服务</span></div>
 
-<div class="card">
+<div class="cards-grid" style="grid-template-columns:1fr 2fr">
+<div class="card" style="grid-row:span 3">
   <div class="card-header"><span class="card-title"><?= svg('srv') ?> 邮件服务</span></div>
   <form method="post" action="?action=settings"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
     <div class="form-group">
@@ -389,48 +410,62 @@ if ($r && $row = $r->fetch_assoc()) {
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">SMTP 账号</label>
-      <input class="form-input" name="smtp_user" value="<?= htmlspecialchars($smtp['user']) ?>" placeholder="user@example.com">
-    </div>
-    <div class="form-group">
-      <label class="form-label">SMTP 密码</label>
-      <input class="form-input" type="password" name="smtp_pass" value="<?= htmlspecialchars($smtp['pass']) ?>" placeholder="留空不修改">
-    </div>
-    <div class="form-row">
-      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">SMTP 账号</label>
+        <input class="form-input" name="smtp_user" value="<?= htmlspecialchars($smtp['user']) ?>" placeholder="user@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">SMTP 密码</label>
+        <input class="form-input" type="password" name="smtp_pass" value="<?= htmlspecialchars($smtp['pass']) ?>" placeholder="留空不修改">
+      </div>
+      <div class="form-group">
         <label class="form-label">发件人邮箱</label>
         <input class="form-input" name="smtp_from" value="<?= htmlspecialchars($smtp['from']) ?>" placeholder="noreply@example.com">
       </div>
-      <div class="form-group" style="flex:1;margin-bottom:0">
+      <div class="form-group">
         <label class="form-label">发件人名称</label>
         <input class="form-input" name="smtp_name" value="<?= htmlspecialchars($smtp['name']) ?>" placeholder="顺雅音乐">
       </div>
-    </div>
     <button class="btn btn-primary btn-block">保存</button>
   </form>
-  <div style="border-top:1px solid rgba(0,0,0,.06);margin:20px 0 0;padding-top:16px">
-    <div style="font-size:13px;font-weight:600;color:rgba(0,0,0,.54);margin-bottom:16px">邮件模板</div>
-    <form method="post" action="?action=settings"><input type="hidden" name="_mail_tpl_submit" value="1"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-      <div class="form-group">
-        <label class="form-label">邮件主题</label>
-        <input class="form-input" name="mail_tpl_subject" value="<?= htmlspecialchars($mailTemplate['subject']) ?>" placeholder="顺雅音乐 - 验证码邮件">
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title"><?= svg('img') ?> 邮件模板</span></div>
+  <div class="tpl-list-wrap" id="tplCardBody">
+    <?php if (empty($mailTemplates)): ?>
+    <div class="empty">暂无邮件模板</div>
+    <?php else: ?>
+    <div class="tpl-list-grid">
+    <?php foreach ($mailTemplates as $tpl):
+      $preview = strip_tags($tpl['body'] ?? ''); $preview = mb_strlen($preview) > 60 ? mb_substr($preview, 0, 60) . '…' : ($preview ?: '空正文');
+      $isDef = !empty($tpl['is_default']);
+    ?>
+      <div class="tpl-item<?= $isDef ? ' tpl-item-default' : '' ?>" id="tplItem<?= (int)$tpl['id'] ?>"
+           data-name="<?= htmlspecialchars($tpl['name']) ?>"
+           data-subject="<?= htmlspecialchars($tpl['subject']) ?>"
+           data-html="<?= !empty($tpl['is_html']) ? '1' : '0' ?>">
+        <div class="tpl-item-top">
+          <span class="tpl-item-name"><?= htmlspecialchars($tpl['name']) ?></span>
+          <?php if ($isDef): ?><span class="tpl-badge-def">默认</span><?php endif; ?>
+          <span class="tpl-badge-fmt"><?= !empty($tpl['is_html']) ? 'HTML' : '纯文本' ?></span>
+        </div>
+        <div class="tpl-item-subject">主题：<?= htmlspecialchars($tpl['subject'] ?: '未设置') ?></div>
+        <div class="tpl-item-preview"><?= htmlspecialchars($preview) ?></div>
+        <textarea class="tpl-body-data" style="display:none"><?= htmlspecialchars($tpl['body'] ?? '') ?></textarea>
+        <div class="tpl-item-actions">
+          <button class="btn btn-sm btn-outline" onclick="openMailTemplateModal(<?= (int)$tpl['id'] ?>)">编辑</button>
+          <?php if (!$isDef): ?><button class="btn btn-sm btn-outline" onclick="setDefaultTemplate(<?= (int)$tpl['id'] ?>)">设默认</button><?php endif; ?>
+          <button class="btn btn-sm btn-outline btn-danger-outline" onclick="deleteTemplate(<?= (int)$tpl['id'] ?>)">删除</button>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">邮件正文</label>
-        <textarea class="form-input" name="mail_tpl_body" rows="6" placeholder="支持 HTML 格式，{code} 会被替换为验证码"><?= htmlspecialchars($mailTemplate['body']) ?></textarea>
-        <small style="display:block;margin-top:6px;color:rgba(0,0,0,.38);font-size:12px"><code>{code}</code> 会被替换为实际验证码。勾选 HTML 模式后支持标签和样式。</small>
-      </div>
-      <div class="form-group">
-        <label class="form-label">发送格式</label>
-        <select name="mail_tpl_html" class="form-input">
-          <option value="0"<?= empty($mailTemplate['html']) ? ' selected' : '' ?>>纯文本格式</option>
-          <option value="1"<?= !empty($mailTemplate['html']) ? ' selected' : '' ?>>HTML 格式（支持标签样式）</option>
-        </select>
-      </div>
-      <button class="btn btn-primary btn-block">保存模板</button>
-    </form>
+    <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    <button class="btn btn-primary btn-block tpl-edit-btn" onclick="openMailTemplateModal(0)">新建模板</button>
   </div>
 </div>
+
+<hr style="grid-column:2;border:none;border-top:1px solid rgba(0,0,0,.15);margin:8px 0">
 
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('key') ?> 密钥数量限制</span></div>
@@ -443,16 +478,17 @@ if ($r && $row = $r->fetch_assoc()) {
     <button class="btn btn-primary btn-block">保存</button>
   </form>
 </div>
+</div>
 
+<div class="cards-grid">
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('play') ?> 音乐 API</span></div>
   <form method="post" action="?action=settings"><input type="hidden" name="_api_submit" value="1"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-    <div class="form-group">
-      <label class="form-label">Meting API 地址</label>
-      <input class="form-input" name="api_meting" value="<?= htmlspecialchars($mapiApi['meting']) ?>" placeholder="https://mapi.bmwy72.top/api">
-      <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">Meting 音乐 API 代理地址，用于获取歌单、封面、播放地址等</small>
-    </div>
     <div class="form-row">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">Meting API 地址</label>
+        <input class="form-input" name="api_meting" value="<?= htmlspecialchars($mapiApi['meting']) ?>" placeholder="https://mapi.bmwy72.top/api">
+      </div>
       <div class="form-group" style="flex:1;margin-bottom:0">
         <label class="form-label">QQ 音乐 Referer</label>
         <input class="form-input" name="api_qq_referer" value="<?= htmlspecialchars($mapiApi['qq_referer']) ?>" placeholder="https://y.qq.com/">
@@ -462,59 +498,55 @@ if ($r && $row = $r->fetch_assoc()) {
         <input class="form-input" name="api_qq_cover" value="<?= htmlspecialchars($mapiApi['qq_cover']) ?>" placeholder="https://y.gtimg.cn/music/photo_new/T002R300x300M000">
       </div>
     </div>
-    <div style="padding-top:4px;margin-bottom:16px;border-top:1px solid rgba(0,0,0,.04)"></div>
+    <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">Meting API 代理地址，用于获取歌单、封面、播放地址等</small>
     <div class="form-row">
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">回调参数名 — ID</label>
+        <label class="form-label">回调 — ID</label>
         <input class="form-input" name="api_param_id" value="<?= htmlspecialchars($mapiApi['param_id']) ?>" placeholder="id">
       </div>
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">回调参数名 — Auth</label>
+        <label class="form-label">回调 — Auth</label>
         <input class="form-input" name="api_param_auth" value="<?= htmlspecialchars($mapiApi['param_auth']) ?>" placeholder="auth">
       </div>
     </div>
-    <div style="padding-top:4px;margin-bottom:16px;border-top:1px solid rgba(0,0,0,.04)"></div>
     <div class="form-row">
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">请求参数名 — 平台</label>
+        <label class="form-label">请求 — 平台</label>
         <input class="form-input" name="api_req_server" value="<?= htmlspecialchars($mapiApi['req_params']['server']) ?>" placeholder="server">
       </div>
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">请求参数名 — 类型</label>
+        <label class="form-label">请求 — 类型</label>
         <input class="form-input" name="api_req_type" value="<?= htmlspecialchars($mapiApi['req_params']['type']) ?>" placeholder="type">
       </div>
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">请求参数名 — 资源ID</label>
+        <label class="form-label">请求 — 资源ID</label>
         <input class="form-input" name="api_req_id" value="<?= htmlspecialchars($mapiApi['req_params']['id']) ?>" placeholder="id">
       </div>
     </div>
-    <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">向 API 发起请求时的查询参数名，不同接口可能使用不同命名</small>
-    <div style="padding-top:4px;margin-bottom:16px;border-top:1px solid rgba(0,0,0,.04)"></div>
+    <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">回调/请求的参数名，不同接口可能使用不同命名</small>
     <div class="form-row">
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">JSON 字段 — 歌名</label>
+        <label class="form-label">JSON — 歌名</label>
         <input class="form-input" name="api_field_title" value="<?= htmlspecialchars($mapiApi['fields']['title']) ?>" placeholder="title">
       </div>
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">JSON 字段 — 歌手</label>
+        <label class="form-label">JSON — 歌手</label>
         <input class="form-input" name="api_field_artist" value="<?= htmlspecialchars($mapiApi['fields']['artist']) ?>" placeholder="author">
       </div>
-    </div>
-    <div class="form-row">
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">JSON 字段 — 播放地址</label>
+        <label class="form-label">JSON — 播放地址</label>
         <input class="form-input" name="api_field_url" value="<?= htmlspecialchars($mapiApi['fields']['url']) ?>" placeholder="url">
       </div>
       <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">JSON 字段 — 封面</label>
+        <label class="form-label">JSON — 封面</label>
         <input class="form-input" name="api_field_pic" value="<?= htmlspecialchars($mapiApi['fields']['pic']) ?>" placeholder="pic">
       </div>
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">JSON — 歌词</label>
+        <input class="form-input" name="api_field_lrc" value="<?= htmlspecialchars($mapiApi['fields']['lrc']) ?>" placeholder="lrc">
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">JSON 字段 — 歌词</label>
-      <input class="form-input" name="api_field_lrc" value="<?= htmlspecialchars($mapiApi['fields']['lrc']) ?>" placeholder="lrc">
-    </div>
-    <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">如果 API 返回的 JSON 字段名不同，在此修改映射关系</small>
+    <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">JSON 返回字段名映射，不一致时在此修改</small>
     <button class="btn btn-primary btn-block">保存</button>
   </form>
 </div>
@@ -547,43 +579,60 @@ if ($r && $row = $r->fetch_assoc()) {
         <input class="form-input" name="s3_region" value="<?= htmlspecialchars($s3['region']) ?>" placeholder="auto（R2 填 auto）">
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">路径前缀（可选）</label>
-      <input class="form-input" name="s3_path_prefix" value="<?= htmlspecialchars($s3['path_prefix']) ?>" placeholder="mapi/music 或留空">
+    <div class="form-row">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">路径前缀（可选）</label>
+        <input class="form-input" name="s3_path_prefix" value="<?= htmlspecialchars($s3['path_prefix']) ?>" placeholder="mapi/music 或留空">
+      </div>
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">自定义域名（可选）</label>
+        <input class="form-input" name="s3_custom_domain" value="<?= htmlspecialchars($s3['custom_domain']) ?>" placeholder="https://cdn.example.com">
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">自定义域名（可选）</label>
-      <input class="form-input" name="s3_custom_domain" value="<?= htmlspecialchars($s3['custom_domain']) ?>" placeholder="https://cdn.example.com">
-      <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">留空则使用 Endpoint 拼接，填写后公开 URL 使用此域名</small>
-    </div>
+    <small style="display:block;margin-top:4px;margin-bottom:0;color:rgba(0,0,0,.38);font-size:11px">留空则使用 Endpoint 拼接，填写后公开 URL 使用此域名</small>
     <button class="btn btn-primary btn-block">保存</button>
   </form>
 </div>
+</div>
 
-<div class="card">
-  <div class="card-header"><span class="card-title"><?= svg('srv') ?> 易支付</span></div>
-  <form method="post" action="?action=settings"><input type="hidden" name="_epay_submit" value="1"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-    <div class="form-group">
-      <label class="form-label">接口地址</label>
-      <input class="form-input" name="epay_api_url" value="<?= htmlspecialchars($epay['api_url']) ?>" placeholder="https://pay.example.com">
-      <small style="display:block;margin-top:4px;color:rgba(0,0,0,.38);font-size:11px">易支付平台域名，不需要带 /submit.php</small>
+<div class="tpl-modal" id="mailTemplateModal" style="display:none">
+  <div class="tpl-modal-backdrop" onclick="closeMailTemplateModal()"></div>
+  <div class="tpl-modal-panel">
+    <div class="tpl-modal-header">
+      <span class="tpl-modal-title" id="tplModalTitle">新建邮件模板</span>
+      <button class="tpl-modal-close" onclick="closeMailTemplateModal()"><?= svg('close') ?></button>
     </div>
-    <div class="form-row">
-      <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">商户 ID</label>
-        <input class="form-input" name="epay_pid" value="<?= htmlspecialchars($epay['pid']) ?>" placeholder="1001">
+    <form class="tpl-modal-body" id="mailTemplateForm" data-modal="1" action="?action=settings" method="post" onsubmit="return handleMailTemplateSubmit(event)">
+      <input type="hidden" name="_mail_tpl_save" value="1">
+      <input type="hidden" name="_mail_tpl_id" id="tplId" value="0">
+      <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+      <div class="form-row tpl-modal-row">
+        <div class="form-group">
+          <label class="form-label">模板名称</label>
+          <input class="form-input" name="mail_tpl_name" id="tplName" placeholder="如：验证码邮件、欢迎邮件">
+        </div>
+        <div class="form-group">
+          <label class="form-label">邮件主题</label>
+          <input class="form-input" name="mail_tpl_subject" id="tplSubject" placeholder="顺雅音乐 - 验证码邮件">
+        </div>
       </div>
-      <div class="form-group" style="flex:1;margin-bottom:0">
-        <label class="form-label">商户密钥</label>
-        <input class="form-input" type="password" name="epay_key" value="<?= htmlspecialchars($epay['key']) ?>" placeholder="商户通信密钥">
+      <div class="form-group">
+        <label class="form-label">发送格式</label>
+        <select name="mail_tpl_html" id="tplHtml" class="form-input">
+          <option value="0">纯文本格式</option>
+          <option value="1">HTML 格式（支持标签样式）</option>
+        </select>
       </div>
+      <div class="form-group">
+        <label class="form-label">邮件正文（支持 HTML）</label>
+        <textarea class="form-input tpl-body-editor" name="mail_tpl_body" id="tplBody" rows="12" placeholder="支持 HTML 格式，{code} 会被替换为验证码"></textarea>
+        <small style="display:block;margin-top:6px;color:rgba(0,0,0,.38);font-size:12px"><code>{code}</code> 会被替换为实际验证码。勾选 HTML 模式后支持标签和样式。</small>
+      </div>
+    </form>
+    <div class="tpl-modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeMailTemplateModal()">取消</button>
+      <button type="submit" class="btn btn-primary" form="mailTemplateForm">保存模板</button>
     </div>
-    <button class="btn btn-primary btn-block">保存</button>
-  </form>
-  <?php if ($epay['api_url'] && $epay['pid'] && $epay['key']): ?>
-  <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,.04)">
-    <a href="?action=epay-test" class="btn btn-primary btn-block" style="background:rgba(46,204,113,.08);color:#2ecc71;border:1px solid rgba(46,204,113,.2)">测试支付 0.01 元</a>
   </div>
-  <?php endif; ?>
 </div>
 <?php endif; ?>

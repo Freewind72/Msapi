@@ -87,13 +87,13 @@ try {
     file_put_contents($configFile, $configContent);
     stream_line('[写入] config/config.php');
 
-    $configHash = hash_file('sha256', $configFile);
     $lockContent = "install_time: " . date('Y-m-d H:i:s') . "\n"
         . "install_type: mysql\n"
         . "php_version: " . PHP_VERSION . "\n"
-        . "signature: msapi\n"
-        . "config_hash: {$configHash}\n";
+        . "signature: msapi\n";
     file_put_contents($lockFile, $lockContent);
+    @mkdir($self . '/assets', 0755, true);
+    file_put_contents($self . '/assets/sha256', hash_file('sha256', $lockFile));
     stream_line('[写入] install/install.lock');
 
     stream_done();
