@@ -63,19 +63,19 @@ if ($isAdmin > 1) {
   <div class="data-item" data-api-key="<?= htmlspecialchars($key['api_key']) ?>">
     <div class="data-body">
       <div class="data-main">
-        <button class="btn-copy" onclick="var k=this.parentNode.nextElementSibling.textContent;navigator.clipboard.writeText(k);var org=this.innerHTML;this.innerHTML='<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><polyline points=&quot;20 6 9 17 4 12&quot;/></svg>';setTimeout(function(){this.innerHTML=org},1500)"><?= svg('copy') ?></button>
+        <button class="btn-copy" onclick="var k=this.closest('.data-item').dataset.apiKey;navigator.clipboard.writeText(k);var org=this.innerHTML;this.innerHTML='<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><polyline points=&quot;20 6 9 17 4 12&quot;/></svg>';setTimeout(function(){this.innerHTML=org},1500)"><?= svg('copy') ?></button>
         <span class="data-label"><?= htmlspecialchars($key['username'] ?? '未绑定') ?></span>
         <span class="tag <?= $key['status'] ? 'tag-ok' : 'tag-off' ?>"><?= $key['status'] ? '启用' : '禁用' ?></span>
       </div>
-      <div class="data-code"><?= htmlspecialchars($key['api_key']) ?></div>
+      <div class="data-code"><?= htmlspecialchars(mask_key($key['api_key'])) ?></div>
       <div class="data-meta">
         <span>歌单 <?php $kid = (int)$key['id']; $pls = $playlistsByKey[$kid] ?? []; echo count($pls) > 0 ? count($pls) . ' 个' : '未设置'; ?></span>
         <span><?= substr($key['created_at'],0,10) ?></span>
       </div>
     </div>
     <div class="data-actions">
-      <button class="btn-sm btn-test-load" data-key="<?= htmlspecialchars($key['api_key']) ?>" onclick="toggleTestPlayer('<?= htmlspecialchars($key['api_key']) ?>')"><?= svg('play') ?> 加载</button>
-      <button class="btn-sm" onclick="copyEmbedKey('<?= htmlspecialchars($key['api_key']) ?>');showToast('嵌入代码已复制','ok')"><?= svg('copy') ?> 嵌入</button>
+      <button class="btn-sm btn-test-load" data-key="<?= htmlspecialchars($key['api_key']) ?>" onclick="toggleTestPlayer(this.dataset.key)"><?= svg('play') ?> 加载</button>
+      <button class="btn-sm" data-key="<?= htmlspecialchars($key['api_key']) ?>" onclick="copyEmbedKey(this.dataset.key);showToast('嵌入代码已复制','ok')"><?= svg('copy') ?> 嵌入</button>
       <form method="post" action="?action=keys-delete" onsubmit="return confirm('确认删除此密钥？')"><input type="hidden" name="_csrf" value="<?= csrf_token() ?>"><input type="hidden" name="id" value="<?= $key['id'] ?>">
         <button class="btn-sm danger"><?= svg('trash') ?> 删除</button>
       </form>

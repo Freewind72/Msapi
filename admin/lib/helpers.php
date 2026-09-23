@@ -31,3 +31,10 @@ function flash_get($k)
     unset($_SESSION['_flash'][$k]);
     return $v;
 }
+
+function mask_key($key)
+{
+    $len = strlen($key);
+    if ($len <= 12) return $key;
+    return substr($key, 0, 8) . '········' . substr($key, -4);
+}

@@ -79,11 +79,12 @@ if (!empty($keys)) {
     $kid = (int)$k['id'];
     $myPlaylists = $playlistsByKid[$kid] ?? [];
   ?>
-  <div class="key-card">
+  <div class="key-card" data-api-key="<?= htmlspecialchars($k['api_key']) ?>">
     <div class="key-card-header">
       <div class="key-card-info">
         <span class="key-card-user"><?= htmlspecialchars($k['username'] ?? '-') ?></span>
-        <code class="key-card-code"><?= htmlspecialchars($k['api_key']) ?></code>
+        <code class="key-card-code"><?= htmlspecialchars(mask_key($k['api_key'])) ?></code>
+        <button class="btn-copy" onclick="var k=this.closest('.key-card').dataset.apiKey;navigator.clipboard.writeText(k);var org=this.innerHTML;this.innerHTML='<svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><polyline points=&quot;20 6 9 17 4 12&quot;/></svg>';setTimeout(function(){this.innerHTML=org},1500)"><?= svg('copy') ?></button>
       </div>
       <div class="key-card-badges">
         <span class="key-badge"><?= count($myPlaylists) ?> 歌单</span>
