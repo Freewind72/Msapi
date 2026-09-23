@@ -1,5 +1,33 @@
 <?php defined('MAPI_ADMIN') or die('禁止直接访问');
 $csrf = csrf_token();
+
+// 密钥列表（含用户信息）
+$keys = [];
+if (($_SESSION['admin_is_admin'] ?? 99) === 0) {
+    $r = $db->query("SELECT k.*, u.username FROM mapi_keys k LEFT JOIN mapi_users u ON k.user_id=u.id ORDER BY k.id DESC");
+} else {
+    $r = $db->query("SELECT k.*, u.username FROM mapi_keys k LEFT JOIN mapi_users u ON k.user_id=u.id WHERE k.user_id=" . (int)$_SESSION['admin_id'] . " ORDER BY k.id DESC");
+}
+if ($r) while ($row = $r->fetch_assoc()) $keys[] = $row;
+
+// 歌单分组数据
+$playlistsByKey = [];
+$r = $db->query("SELECT id, key_id, name, type, remote_id, server, cover_url, cover_mode, sort_order FROM mapi_playlists ORDER BY sort_order ASC, id ASC");
+if ($r) while ($row = $r->fetch_assoc()) {
+    $kid = (int)$row['key_id'];
+    if (!isset($playlistsByKey[$kid])) $playlistsByKey[$kid] = [];
+    $playlistsByKey[$kid][] = $row;
+}
+
+// 歌曲分组数据
+$songsByPlaylist = [];
+$r = $db->query("SELECT id, playlist_id, song_id, name, artist, server, sort_order FROM mapi_songs ORDER BY sort_order ASC, id ASC");
+if ($r) while ($row = $r->fetch_assoc()) {
+    $pid = (int)$row['playlist_id'];
+    if (!isset($songsByPlaylist[$pid])) $songsByPlaylist[$pid] = [];
+    $songsByPlaylist[$pid][] = $row;
+}
+
 $playlistsByKid = $playlistsByKey ?? [];
 $songsByPl = $songsByPlaylist ?? [];
 $searchToken = '';

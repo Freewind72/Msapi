@@ -249,7 +249,7 @@ async function startInstall() {
 
     navStep(5);
     const t = $('termBox');
-    t.innerHTML = '';
+    t.innerHTML = '<div class="line">\u8fde\u63a5\u4e2d...</div>';
     $('doneArea').classList.remove('show');
 
     try {
@@ -259,6 +259,15 @@ async function startInstall() {
             body: JSON.stringify(data),
         });
 
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+        if (!resp.body) {
+            const r = await resp.json();
+            if (r.error) throw new Error(r.error);
+            throw new Error('\u670d\u52a1\u5668\u672a\u8fd4\u56de\u6d41\u5f0f\u54cd\u5e94');
+        }
+
+        t.innerHTML = '';
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -302,7 +311,7 @@ async function startInstall() {
         }
     } catch (e) {
         t.innerHTML += '<div class="line err">' +
-            svgIcon(I.close) + ' \u8bf7\u6c42\u5931\u8d25\uff1a' + escapeHtml(e.message) + '</div>';
+            svgIcon(I.close) + ' ' + escapeHtml(e.message) + '</div>';
         t.innerHTML += '<span class="cursor"></span>';
         t.scrollTop = t.scrollHeight;
     }

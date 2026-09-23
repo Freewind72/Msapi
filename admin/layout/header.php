@@ -18,6 +18,7 @@ function svg($name) {
         'play' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
         'stop' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
         'upload' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+        'close' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
     ];
     return $icons[$name] ?? '';
 }
@@ -25,8 +26,6 @@ function svg($name) {
 $navItems = [
     'dashboard' => ['label' => '仪表盘', 'icon' => svg('dash')],
     'keys' => ['label' => '密钥', 'icon' => svg('key')],
-    'shop' => ['label' => '商店', 'icon' => svg('srv')],
-    'orders' => ['label' => '订单', 'icon' => svg('config')],
     'users' => ['label' => '人员', 'icon' => svg('user')],
     'config' => ['label' => '配置', 'icon' => svg('config')],
     'settings' => ['label' => '设置', 'icon' => svg('srv')],
@@ -66,7 +65,11 @@ if (!$bgVideoUrl && !$bgStyle && !empty($_SESSION['admin_background']) && functi
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>顺雅管理 · <?= $action === 'profile' ? '个人资料' : ($action === 'playlist-detail' ? '歌单详情' : htmlspecialchars($navItems[$action]['label'] ?? '')) ?></title>
-<link rel="stylesheet" href="<?= str_replace('{device}', $isMobile ? 'mobile' : 'pc', $RELAY['page']['admin_css']) ?>">
+<?php $device = $isMobile ? 'mobile' : 'pc'; ?>
+<link rel="stylesheet" href="<?= str_replace('{device}', $device, $RELAY['page']['base_css']) ?>">
+<?php $pageCssKey = $action . '_css'; if (isset($RELAY['page'][$pageCssKey])): ?>
+<link id="page-css" rel="stylesheet" href="<?= str_replace('{device}', $device, $RELAY['page'][$pageCssKey]) ?>">
+<?php endif; ?>
 <link rel="stylesheet" href="<?= $RELAY['cm']['core_css'] ?>">
 <link rel="stylesheet" href="<?= $RELAY['cm']['theme_monokai'] ?>">
 <script src="<?= $RELAY['sdk']['pusher_js'] ?>"></script>
@@ -82,20 +85,47 @@ if (!$bgVideoUrl && !$bgStyle && !empty($_SESSION['admin_background']) && functi
 <?php if ($bgVideoUrl): ?>
 <video class="bg-video" autoplay muted loop playsinline><source src="<?= htmlspecialchars($bgVideoUrl) ?>" type="video/<?= $bgVideoExt ?>"></video>
 <?php endif; ?>
-<div class="topbar glass">
+<?php if ($isMobile): ?>
+<div class="topbar" id="topbar">
   <span class="topbar-title">顺雅管理</span>
   <nav class="topbar-nav" id="topbarNav">
+    <span class="topbar-pill" id="topbarPill"></span>
 <?php foreach ($navItems as $k => $item): if (($k === 'settings' || $k === 'users') && (($_SESSION['admin_is_admin'] ?? 99) > 1)) continue; ?>
-    <a href="?action=<?= $k ?>" class="topbar-nav-item<?= $k === $action ? ' active' : '' ?>"><?= $item['icon'] ?><span><?= $item['label'] ?></span></a>
+    <a href="?action=<?= $k ?>" class="topbar-nav-item<?= $k === $action ? ' active' : '' ?>">
+      <span class="topbar-nav-icon"><?= $item['icon'] ?></span>
+      <span class="topbar-nav-label"><?= $item['label'] ?></span>
+    </a>
 <?php endforeach; ?>
   </nav>
-  <div class="topbar-pill" id="topbarPill"></div>
   <div class="topbar-right">
-    <span class="mobile-only topbar-username"><?= htmlspecialchars($_SESSION['admin_user']) ?></span>
-    <a href="?action=logout" class="topbar-logout" title="退出"><?= svg('exit') ?></a>
-    <a href="?action=profile" class="topbar-user" style="overflow:hidden"><?php if ($qq = $_SESSION['admin_qq'] ?? ''): ?><img src="<?= $RELAY['avatar']['qq'] ?>?b=qq&nk=<?= (int)$qq ?>&s=100" style="width:32px;height:32px;border-radius:50%;display:block"><?php else: ?><?= htmlspecialchars(mb_substr($_SESSION['admin_user'],0,1,'UTF-8')) ?><?php endif; ?></a>
+    <a href="?action=profile" class="topbar-user">
+      <span class="topbar-avatar"><?php if ($qq = $_SESSION['admin_qq'] ?? ''): ?><img src="<?= $RELAY['avatar']['qq'] ?>?b=qq&nk=<?= (int)$qq ?>&s=100"><?php else: ?><span class="topbar-avatar-fallback"><?= htmlspecialchars(mb_substr($_SESSION['admin_user'],0,1,'UTF-8')) ?></span><?php endif; ?></span>
+      <span class="topbar-username"><?= htmlspecialchars($_SESSION['admin_user']) ?></span>
+    </a>
   </div>
 </div>
-<div class="wrap">
-<?php if ($msg): ?><script>setTimeout(function(){showToast('<?= addslashes(htmlspecialchars($msg)) ?>','ok')},100)</script><?php endif; ?>
+<?php else: ?>
+<div class="sidebar glass" id="sidebar">
+  <div class="sidebar-brand" id="sbBrand" title="折叠侧边栏" role="button" tabindex="0">
+    <img class="sidebar-logo" src="../favicon.ico" alt="">
+    <span class="sidebar-title">顺雅管理</span>
+  </div>
+  <nav class="sidebar-nav" id="sidebarNav">
+<?php foreach ($navItems as $k => $item): if (($k === 'settings' || $k === 'users') && (($_SESSION['admin_is_admin'] ?? 99) > 1)) continue; ?>
+    <a href="?action=<?= $k ?>" class="sb-item<?= $k === $action ? ' active' : '' ?>">
+      <span class="sb-icon"><?= $item['icon'] ?></span>
+      <span class="sb-label"><?= $item['label'] ?></span>
+    </a>
+<?php endforeach; ?>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="?action=profile" class="sb-user">
+      <span class="sb-avatar"><?php if ($qq = $_SESSION['admin_qq'] ?? ''): ?><img src="<?= $RELAY['avatar']['qq'] ?>?b=qq&nk=<?= (int)$qq ?>&s=100"><?php else: ?><span class="sb-avatar-fallback"><?= htmlspecialchars(mb_substr($_SESSION['admin_user'],0,1,'UTF-8')) ?></span><?php endif; ?></span>
+      <span class="sb-username"><?= htmlspecialchars($_SESSION['admin_user']) ?></span>
+    </a>
+    <a href="?action=logout" class="sb-logout" title="退出"><?= svg('exit') ?><span>退出</span></a>
+  </div>
+</div>
+<?php endif; ?>
+<div class="wrap"><?php if ($msg): ?><script>setTimeout(function(){showToast('<?= addslashes(htmlspecialchars($msg)) ?>','ok')},100)</script><?php endif; ?>
 <?php if ($err): ?><script>setTimeout(function(){showToast('<?= addslashes(htmlspecialchars($err)) ?>','err')},100)</script><?php endif; ?>

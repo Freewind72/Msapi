@@ -19,14 +19,27 @@ $action = $_GET['action'] ?? $input['action'] ?? '';
 require_once __DIR__ . '/lib/functions.php';
 
 if (in_array($action, ['init_sqlite', 'init_mysql'], true)) {
-    ini_set('output_buffering', 'Off');
-    ini_set('zlib.output_compression', 'Off');
-    while (ob_get_level()) ob_end_clean();
+    while (@ob_end_clean());
+
+    // 阻止 Apache mod_deflate 压缩（压缩会阻塞流式输出）
+    if (function_exists('apache_setenv')) @apache_setenv('no-gzip', '1');
+
     header('Content-Type: application/x-ndjson; charset=utf-8');
-    header('Cache-Control: no-cache');
+    header('Content-Encoding: none');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
     header('X-Accel-Buffering: no');
     header('Access-Control-Allow-Origin: *');
-    require __DIR__ . '/handlers/' . $action . '.php';
+
+    // 4096 字节填充，撑满服务器缓冲区强制立即发送
+    echo str_repeat(' ', 4096) . "\n";
+    if (ob_get_level()) ob_flush();
+    flush();
+
+    try {
+        require __DIR__ . '/handlers/' . $action . '.php';
+    } catch (Throwable $e) {
+        echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE) . "\n";
+    }
     exit;
 }
 

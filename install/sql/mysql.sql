@@ -82,6 +82,19 @@ CREATE TABLE IF NOT EXISTS `mapi_products` (
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- mapi_mail_templates
+CREATE TABLE IF NOT EXISTS `mapi_mail_templates` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL DEFAULT '',
+    `subject` VARCHAR(200) NOT NULL DEFAULT '顺雅音乐 - 验证码邮件',
+    `body` TEXT,
+    `is_html` TINYINT NOT NULL DEFAULT 0,
+    `is_default` TINYINT NOT NULL DEFAULT 0,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- mapi_tokens
 CREATE TABLE IF NOT EXISTS `mapi_tokens` (
     `token` VARCHAR(80) NOT NULL,
