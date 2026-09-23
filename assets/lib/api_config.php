@@ -1,0 +1,67 @@
+<?php
+
+/**
+ * API 配置读取器 — 从数据库 mapi_config 表统一读取 MAPI API 配置
+ * 消除 admin/api/api.php、qq_api.php、wy_api.php、admin/index.php 中 4 处重复代码
+ *
+ * @param object|null $db  数据库连接对象
+ * @param array       $CFG 基础配置数组（作为默认值回退）
+ * @return array 规范化后的 API 配置数组
+ */
+function read_mapi_api_config($db, array $CFG): array
+{
+    $config = [
+        'base_url'     => $CFG['api']['base_url']      ?? '',
+        'qq_referer'   => $CFG['api']['qq_referer']    ?? '',
+        'qq_cover'     => $CFG['api']['qq_cover']      ?? '',
+        'field_title'  => $CFG['api']['field_title']   ?? 'title',
+        'field_artist' => $CFG['api']['field_artist']  ?? 'author',
+        'field_url'    => $CFG['api']['field_url']     ?? 'url',
+        'field_pic'    => $CFG['api']['field_pic']     ?? 'pic',
+        'field_lrc'    => $CFG['api']['field_lrc']     ?? 'lrc',
+        'param_id'     => $CFG['api']['param_id']      ?? 'id',
+        'param_auth'   => $CFG['api']['param_auth']    ?? 'auth',
+        'param_server' => $CFG['api']['param_server']  ?? 'server',
+        'param_type'   => $CFG['api']['param_type']    ?? 'type',
+    ];
+
+    if (!$db) {
+        return $config;
+    }
+
+    $r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='mapi_api'");
+    if (!$r) {
+        return $config;
+    }
+
+    $row = $r->fetch_assoc();
+    if (!$row || !$row['config_value']) {
+        return $config;
+    }
+
+    $saved = json_decode($row['config_value'], true);
+    if (!is_array($saved)) {
+        return $config;
+    }
+
+    if (!empty($saved['meting']))   $config['base_url']   = $saved['meting'];
+    if (!empty($saved['qq_referer'])) $config['qq_referer'] = $saved['qq_referer'];
+    if (!empty($saved['qq_cover'])) $config['qq_cover']   = $saved['qq_cover'];
+    if (!empty($saved['param_id'])) $config['param_id']   = $saved['param_id'];
+    if (!empty($saved['param_auth'])) $config['param_auth'] = $saved['param_auth'];
+
+    if (!empty($saved['req_params']) && is_array($saved['req_params'])) {
+        if (!empty($saved['req_params']['server'])) $config['param_server'] = $saved['req_params']['server'];
+        if (!empty($saved['req_params']['type']))   $config['param_type']   = $saved['req_params']['type'];
+    }
+
+    if (!empty($saved['fields']) && is_array($saved['fields'])) {
+        if (!empty($saved['fields']['title']))  $config['field_title']  = $saved['fields']['title'];
+        if (!empty($saved['fields']['artist'])) $config['field_artist'] = $saved['fields']['artist'];
+        if (!empty($saved['fields']['url']))    $config['field_url']    = $saved['fields']['url'];
+        if (!empty($saved['fields']['pic']))    $config['field_pic']    = $saved['fields']['pic'];
+        if (!empty($saved['fields']['lrc']))    $config['field_lrc']    = $saved['fields']['lrc'];
+    }
+
+    return $config;
+}

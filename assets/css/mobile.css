@@ -1,0 +1,37 @@
+/* ═══════════ RESPONSIVE — max-width: 1024px ═══════════ */
+@media(max-width:1024px){
+  .features-grid{grid-template-columns:1fr 1fr}
+  .feat-card.col-2{grid-column:span 2}
+  .feat-card.col-1{grid-column:span 1}
+}
+
+/* ═══════════ RESPONSIVE — max-width: 768px ═══════════ */
+@media(max-width:768px){
+  .hero{padding:80px 6% 60px;min-height:90vh}
+  .hero-title .line1{font-size:clamp(1.6rem,7vw,2.5rem)}
+  .hero-title .line2{font-size:clamp(2.8rem,12vw,5rem)}
+  .hero-sub{font-size:.9rem;max-width:320px}
+  .hero-stats{flex-direction:column;gap:16px;margin-top:40px}
+  .hero-stat-divider{width:20px;height:1px}
+  .hero-stat-value{font-size:1.8rem}
+  .hero-stat-item{padding:8px 0}
+  .features-grid{grid-template-columns:1fr}
+  .feat-card.col-2,.feat-card.col-1{grid-column:span 1}
+  .feat-num{font-size:3.5rem}
+  .features-section,.terminal-section{padding:60px 6%}
+  .terminal-window{max-width:100%}
+  .terminal-body{padding:18px 16px}
+  .terminal-line{font-size:.74rem}
+  .coda-section{padding:60px 6% 80px}
+  .feat-card{padding:28px}
+}
+
+/* ═══════════ RESPONSIVE — max-width: 480px ═══════════ */
+@media(max-width:480px){
+  .hero{padding:60px 5% 40px;min-height:90vh}
+  .hero-title .line1{font-size:clamp(1.4rem,6vw,2rem)}
+  .hero-title .line2{font-size:clamp(2.4rem,10vw,3.6rem)}
+  .hero-sub{font-size:.82rem}
+  .hero-cta{padding:12px 28px;font-size:.82rem}
+  .hero-stats{margin-top:32px}
+}

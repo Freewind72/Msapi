@@ -1,0 +1,68 @@
+<?php
+
+$RELAY = [
+
+    'cdn' => [
+        'bootstrap_css'    => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+        'bootstrap_js'     => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+        'bootstrap_icons'  => 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css',
+        'aplayer_css'      => 'https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.css',
+        'aplayer_js'       => 'https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.js',
+    ],
+
+    'sdk' => [
+        'pusher_js'        => 'https://js.pusher.com/8.2.0/pusher.min.js',
+        'geetest_js'       => 'https://static.geetest.com/v4/gt4.js',
+    ],
+
+    'api' => [
+        'pusher_base'      => 'https://api-ap3.pusher.com',
+        'geetest_validate' => 'https://gcaptcha4.geetest.com/validate',
+    ],
+
+    'avatar' => [
+        'qq'               => 'https://q1.qlogo.cn/g',
+    ],
+
+    'music' => [
+        'qq_referer'       => 'https://y.qq.com',
+        'qq_cover'         => 'https://y.qq.com',
+        'netease_referer'  => 'https://music.163.com/',
+    ],
+
+    'asset' => [
+        'admin_css'        => '/admin/assets/css',
+        'admin_js'         => '/admin/assets/js',
+        'codemirror'       => '/admin/assets/codemirror',
+        'front_css'        => '/assets/css',
+        'front_js'         => '/assets/js',
+        'embed_js'         => '/embed.js',
+        'widget_php'       => '/assets/lib/widget.php',
+        'jwt_php'          => '/assets/lib/jwt.php',
+    ],
+
+    'page' => [
+        'admin_css'        => '/admin/assets/css/{device}/admin.css',
+        'login_css'        => '/admin/assets/css/{device}/login.css',
+        'admin_js'         => '/admin/assets/js/admin.js',
+        'login_js'         => '/admin/assets/js/login.js',
+        'pc_css'           => '/assets/css/pc.css',
+        'mobile_css'       => '/assets/css/mobile.css',
+        'pc_js'            => '/assets/js/pc.js',
+        'mobile_js'        => '/assets/js/mobile.js',
+    ],
+
+    'cm' => [
+        'core_css'         => '/admin/assets/codemirror/codemirror.min.css',
+        'theme_monokai'    => '/admin/assets/codemirror/theme/monokai.min.css',
+        'core_js'          => '/admin/assets/codemirror/codemirror.min.js',
+        'mode_xml'         => '/admin/assets/codemirror/mode/xml/xml.min.js',
+        'mode_css'         => '/admin/assets/codemirror/mode/css/css.min.js',
+        'mode_js'          => '/admin/assets/codemirror/mode/javascript/javascript.min.js',
+        'mode_html'        => '/admin/assets/codemirror/mode/htmlmixed/htmlmixed.min.js',
+        'addon_activeline' => '/admin/assets/codemirror/addon/selection/active-line.min.js',
+    ],
+
+];
+
+return $RELAY;

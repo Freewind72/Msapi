@@ -1,0 +1,42 @@
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#eef0f4;color:#1a1a2e;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.glass{background:rgba(255,255,255,.5);backdrop-filter:blur(24px)saturate(200%);-webkit-backdrop-filter:blur(24px)saturate(200%);border:1px solid rgba(255,255,255,.65);border-radius:16px}
+
+.push-container{display:none}
+.login-mobile{display:block;width:100%;max-width:380px}
+
+.flip-wrap{perspective:800px;width:100%}
+.flip-outer{position:relative;height:440px}
+.flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.4,0,.2,1)}
+.flip-inner.reg{transform:rotateY(180deg)}
+.flip-inner>*{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;padding:24px 28px;text-align:center;border-radius:16px;overflow:hidden}
+.flip-back{transform:rotateY(180deg);overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+.flip-back::-webkit-scrollbar{display:none}
+
+h1{font-size:20px;font-weight:800;margin-bottom:2px;letter-spacing:-.01em}
+.sub{font-size:12px;color:rgba(0,0,0,.4);margin-bottom:16px}
+
+.tabs{display:flex;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid rgba(0,0,0,.06)}
+.tab{flex:1;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:rgba(0,0,0,.03);color:rgba(0,0,0,.4);border:none;font-family:inherit;transition:all .2s}
+.tab.act{background:rgba(255,255,255,.5);color:#1a1a2e}
+
+form{display:flex;flex-direction:column;gap:10px}
+.fl{text-align:left}
+.fl label{font-size:12px;font-weight:600;color:rgba(0,0,0,.4);display:block;margin-bottom:5px}
+.fl input{width:100%;padding:11px 14px;border-radius:8px;border:1px solid rgba(0,0,0,.06);background:rgba(255,255,255,.4);font-size:15px;outline:none;font-family:inherit;color:#1a1a2e;transition:border-color .2s,box-shadow .2s}
+.fl input:focus{border-color:rgba(0,0,0,.15);box-shadow:0 0 0 3px rgba(0,0,0,.03)}
+
+.btn{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.5);backdrop-filter:blur(8px);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:#1a1a2e;transition:all .2s}
+.btn:active{background:rgba(255,255,255,.7)}
+
+.er{font-size:12px;color:#e74c3c;margin-bottom:8px}
+
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-20px);z-index:99999;padding:8px 18px;border-radius:8px;font-size:12px;border:1px solid;backdrop-filter:blur(12px);pointer-events:none;opacity:0;transition:opacity .3s,transform .3s}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{background:rgba(46,204,113,.12)!important;color:#2ecc71!important;border-color:rgba(46,204,113,.25)!important}
+#toast.err{background:rgba(231,76,60,.12)!important;color:#e74c3c!important;border-color:rgba(231,76,60,.25)!important}
+#modalOverlay{display:none;position:fixed;z-index:999999;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center}
+#modalOverlay .modalBox{background:#fff;border-radius:12px;padding:28px 24px 20px;min-width:280px;max-width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+#modalOverlay .modalBox p{margin:0 0 16px;font-size:14px;color:#333;line-height:1.6}
+body[data-theme="dark"] #modalOverlay .modalBox{background:#2a2a3e}
+body[data-theme="dark"] #modalOverlay .modalBox p{color:#ccc}
