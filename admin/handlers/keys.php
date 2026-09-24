@@ -4,12 +4,6 @@ if ($action === 'keys-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_require();
     $isAdmin = $_SESSION['admin_is_admin'] ?? 99;
     if ($isAdmin > 1) {
-        $r = $db->query("SELECT expire_at FROM mapi_users WHERE id=" . (int)$_SESSION['admin_id']);
-        $expireAt = $r ? $r->fetch_assoc()['expire_at'] : null;
-        if (!$expireAt || strtotime($expireAt) < time()) {
-            flash_set('err', '账户未激活或已过期，无法创建密钥');
-            header('Location: ?action=keys'); exit;
-        }
         $limit = 1;
         $r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='key_limit'");
         if ($r && $row = $r->fetch_assoc()) {

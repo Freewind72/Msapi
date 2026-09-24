@@ -44,7 +44,7 @@ try {
     $qq    = $input['qq'] ?? '';
     $email = $input['email'] ?? '';
 
-    $stmt = $m->prepare("INSERT INTO mapi_users (id, username, password, qq, email, is_admin, expire_at) VALUES (1, ?, ?, ?, ?, 0, '2099-12-31 23:59:59') ON DUPLICATE KEY UPDATE username=VALUES(username), password=VALUES(password), qq=VALUES(qq), email=VALUES(email), is_admin=VALUES(is_admin), expire_at=VALUES(expire_at)");
+    $stmt = $m->prepare("INSERT INTO mapi_users (id, username, password, qq, email, is_admin) VALUES (1, ?, ?, ?, ?, 0) ON DUPLICATE KEY UPDATE username=VALUES(username), password=VALUES(password), qq=VALUES(qq), email=VALUES(email), is_admin=VALUES(is_admin)");
     $stmt->execute([$username, $password, $qq, $email]);
     stream_line('[用户] 管理员创建完成');
 
