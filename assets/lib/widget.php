@@ -1,15 +1,5 @@
 <?php
-if (!isset($RELAY) || !isset($superToken)) return;
-
-if ($superToken) {
-    setcookie('mapi_token', $superToken, [
-        'expires'  => time() + 900,
-        'path'     => '/',
-        'httponly' => false,
-        'samesite' => 'Lax',
-        'secure'   => ($_SERVER['HTTPS'] ?? '') === 'on',
-    ]);
-}
+if (!isset($RELAY)) return;
 $embedJs = $RELAY['asset']['embed_js'];
 ?>
 <script>

@@ -18,13 +18,13 @@ $_current_api_key = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
-rate_limit_check('api', 120, 60);
-
 $CFG = require __DIR__ . '/../../config/config.php';
 $jwt_secret = $CFG['api']['jwt_secret'] ?? hash('sha256', ($CFG['db']['password'] ?? '') . ($CFG['site']['url'] ?? ''));
 require __DIR__ . '/../../assets/lib/db.php';
 require __DIR__ . '/../../assets/lib/api_config.php';
 require __DIR__ . '/../../assets/lib/helpers.php';
+
+rate_limit_check('api', 120, 60);
 
 $db_log = db_connect();
 $api    = read_mapi_api_config($db_log, $CFG);
@@ -335,6 +335,8 @@ switch ($action) {
                     setcookie('mapi_sid', $csid, ['expires' => time() + 86400, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
                 }
                 $k = $data['key'];
+            } elseif ($tk !== '') {
+                $k = $tk;
             }
         }
         $_current_api_key = $k;

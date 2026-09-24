@@ -77,5 +77,12 @@ function updateTestPlayerButtons(){
 
 (function(){
   try{var savedKey=localStorage.getItem('_mapiPlayerKey')}catch(e){return}
-  if(savedKey)loadTestPlayer(savedKey);
+  if(savedKey){
+    if(window.__mapiPlayer){
+      _testPlayerKey=savedKey;
+      updateTestPlayerButtons();
+      return;
+    }
+    loadTestPlayer(savedKey);
+  }
 })();

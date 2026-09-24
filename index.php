@@ -39,6 +39,17 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 $st = number_format($totalCalls);
 $sd = number_format($todayCalls);
+
+// mapi_token cookie 必须在 HTML 输出前设置
+if ($superToken) {
+    setcookie('mapi_token', $superToken, [
+        'expires'  => time() + 900,
+        'path'     => '/',
+        'httponly' => false,
+        'samesite' => 'Lax',
+        'secure'   => ($_SERVER['HTTPS'] ?? '') === 'on',
+    ]);
+}
 ?><!DOCTYPE html>
 <html lang="zh-CN">
 <head>

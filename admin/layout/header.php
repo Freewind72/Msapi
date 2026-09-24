@@ -47,10 +47,21 @@ $bgVideoUrl = '';
 $bgVideoExt = '';
 if (!empty($_SESSION['admin_background_url'])) {
     $bgVideoUrl = $_SESSION['admin_background_url'];
-    $bgExt = strtolower(pathinfo(Uri\Rfc3986\Uri::parse($bgVideoUrl)->getPath(), PATHINFO_EXTENSION));
-    if (in_array($bgExt, ['mp4', 'webm', 'ogg', 'mov'])) {
-        $bgVideoExt = $bgExt === 'mov' ? 'mp4' : ($bgExt === 'ogg' ? 'ogg' : $bgExt);
-    } else {
+    try {
+        $uri = Uri\Rfc3986\Uri::parse($bgVideoUrl);
+        if ($uri !== null) {
+            $bgExt = strtolower(pathinfo($uri->getPath(), PATHINFO_EXTENSION));
+            if (in_array($bgExt, ['mp4', 'webm', 'ogg', 'mov'])) {
+                $bgVideoExt = $bgExt === 'mov' ? 'mp4' : ($bgExt === 'ogg' ? 'ogg' : $bgExt);
+            } else {
+                $bgStyle = 'background-image:url(' . htmlspecialchars($bgVideoUrl) . ');background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed';
+                $bgVideoUrl = '';
+            }
+        } else {
+            $bgStyle = 'background-image:url(' . htmlspecialchars($bgVideoUrl) . ');background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed';
+            $bgVideoUrl = '';
+        }
+    } catch (\Throwable $e) {
         $bgStyle = 'background-image:url(' . htmlspecialchars($bgVideoUrl) . ');background-size:cover;background-position:center;background-repeat:no-repeat;background-attachment:fixed';
         $bgVideoUrl = '';
     }
