@@ -310,15 +310,12 @@ switch ($action) {
             setcookie('mapi_sid', $sid, ['expires' => time() + $ttl, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
             json_exit(['valid' => true, 'token' => $token, 'msg' => 'ok (db offline)']);
         }
-        $stmt = $db_log->prepare("SELECT k.id, u.expire_at FROM mapi_keys k LEFT JOIN mapi_users u ON k.user_id=u.id WHERE k.api_key=? AND k.status=1");
+        $stmt = $db_log->prepare("SELECT k.id FROM mapi_keys k WHERE k.api_key=? AND k.status=1");
         $stmt->bind_param('s', $k);
         $stmt->execute();
         $r = $stmt->get_result();
         $row = $r ? $r->fetch_assoc() : null;
         if (!$row) json_exit(['valid' => false, 'msg' => 'invalid key']);
-        if (!$row['expire_at'] || strtotime($row['expire_at']) < time()) {
-            json_exit(['valid' => false, 'msg' => $row['expire_at'] ? '账户已过期，请续费' : '账户未激活']);
-        }
         $token = jwt_encode(['key' => $k, 'sid' => $sid, 'exp' => time() + $ttl, 'iat' => time()], $jwt_secret);
         setcookie('mapi_sid', $sid, ['expires' => time() + $ttl, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
         json_exit(['valid' => true, 'token' => $token, 'msg' => 'ok']);
@@ -354,13 +351,13 @@ switch ($action) {
         $keyRow = $keyRes->fetch_assoc();
         if (!$keyRow) json_exit(['ok' => false, 'config' => null, 'msg' => 'invalid key']);
         $userId = (int)$keyRow['user_id'];
-        $userStmt = $db_log->prepare("SELECT auto_theme, theme_mode, lyrics_default, autoplay_default, expire_at FROM mapi_users WHERE id=?");
+        $userStmt = $db_log->prepare("SELECT auto_theme, theme_mode, lyrics_default, autoplay_default FROM mapi_users WHERE id=?");
         $userStmt->bind_param('i', $userId);
         $userStmt->execute();
         $userRes = $userStmt->get_result();
         $userRow = $userRes->fetch_assoc();
-        if (!$userRow || !$userRow['expire_at'] || strtotime($userRow['expire_at']) < time()) {
-            json_exit(['ok' => false, 'config' => null, 'msg' => $userRow && $userRow['expire_at'] ? '账户已过期' : '账户未激活']);
+        if (!$userRow) {
+            json_exit(['ok' => false, 'config' => null, 'msg' => '用户不存在']);
         }
         $autoTheme = $userRow ? (int)$userRow['auto_theme'] : 1;
         $themeMode = $userRow ? $userRow['theme_mode'] : 'light';
@@ -426,13 +423,13 @@ switch ($action) {
         $keyRow = $keyRes->fetch_assoc();
         if (!$keyRow) json_exit(['enabled' => false, 'content' => '', 'msg' => 'invalid key']);
         $userId = (int)$keyRow['user_id'];
-        $userStmt = $db_log->prepare("SELECT expire_at FROM mapi_users WHERE id=?");
+        $userStmt = $db_log->prepare("SELECT id FROM mapi_users WHERE id=?");
         $userStmt->bind_param('i', $userId);
         $userStmt->execute();
         $userRes = $userStmt->get_result();
         $userRow = $userRes->fetch_assoc();
-        if (!$userRow || !$userRow['expire_at'] || strtotime($userRow['expire_at']) < time()) {
-            json_exit(['enabled' => false, 'content' => '', 'msg' => $userRow && $userRow['expire_at'] ? '账户已过期' : '账户未激活']);
+        if (!$userRow) {
+            json_exit(['enabled' => false, 'content' => '', 'msg' => '用户不存在']);
         }
         $r = $db_log->query("SELECT config_value FROM mapi_config WHERE config_key='announcement'");
         $row = $r ? $r->fetch_assoc() : null;

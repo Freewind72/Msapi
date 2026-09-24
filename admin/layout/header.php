@@ -19,6 +19,8 @@ function svg($name) {
         'stop' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
         'upload' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
         'close' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+        'music' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+        'disc' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>',
     ];
     return $icons[$name] ?? '';
 }
@@ -35,6 +37,24 @@ function formatBytes($b) {
     if ($b < 1024) return $b . 'B';
     if ($b < 1048576) return round($b / 1024, 1) . 'KB';
     return round($b / 1048576, 1) . 'MB';
+}
+
+$adminPlayerToken = '';
+$jwtSecret = $cfg['api']['jwt_secret'] ?? hash('sha256', ($cfg['db']['password'] ?? '') . ($cfg['site']['url'] ?? ''));
+if (!empty($db) && empty($db->connect_error) && empty($db->_error)) {
+    $r = $db->query("SELECT api_key FROM mapi_keys WHERE status=1 ORDER BY id ASC LIMIT 1");
+    if ($r && $row = $r->fetch_assoc()) {
+        $adminPlayerToken = jwt_encode(['key' => $row['api_key'], 'exp' => time() + 86400, 'iat' => time()], $jwtSecret);
+    }
+}
+if ($adminPlayerToken) {
+    setcookie('mapi_token', $adminPlayerToken, [
+        'expires'  => time() + 86400,
+        'path'     => '/',
+        'httponly' => false,
+        'samesite' => 'Lax',
+        'secure'   => ($_SERVER['HTTPS'] ?? '') === 'on',
+    ]);
 }
 
 header('Cache-Control: no-store, private');

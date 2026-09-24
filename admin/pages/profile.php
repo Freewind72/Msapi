@@ -12,28 +12,7 @@ if ($bgKey && function_exists('s3_get_url')) {
     $bgUrl = s3_get_url($bgKey);
 }
 $uid = (int)$_SESSION['admin_id'];
-$er = $db->query("SELECT expire_at FROM mapi_users WHERE id=$uid");
-$expireAt = ($er && $erow = $er->fetch_assoc()) ? $erow['expire_at'] : null;
 ?>
-
-<?php if ($expireAt): ?>
-<div class="card" style="border-left:3px solid <?= strtotime($expireAt) > time() ? '#2ecc71' : '#e74c3c' ?>">
-  <div style="display:flex;align-items:center;justify-content:space-between">
-    <span style="font-weight:600">账户有效期</span>
-    <span style="color:<?= strtotime($expireAt) > time() ? '#2ecc71' : '#e74c3c' ?>;font-weight:700">
-      <?php if (strtotime($expireAt) > time()): ?>
-        至 <?= date('Y-m-d H:i', strtotime($expireAt)) ?>
-      <?php else: ?>
-        已过期 (<?= date('Y-m-d', strtotime($expireAt)) ?>)
-      <?php endif; ?>
-    </span>
-  </div>
-</div>
-<?php else: ?>
-<div class="card" style="border-left:3px solid #e74c3c">
-  <span style="font-weight:600;color:#e74c3c">账户未激活</span>
-</div>
-<?php endif; ?>
 
 <div class="cards-grid">
 <div class="card">

@@ -38,7 +38,7 @@ try {
     $qq    = $input['qq'] ?? '';
     $email = $input['email'] ?? '';
 
-    $stmt = $db->prepare("INSERT OR REPLACE INTO mapi_users (id, username, password, qq, email, is_admin, expire_at) VALUES (1, ?, ?, ?, ?, 0, '2099-12-31 23:59:59')");
+    $stmt = $db->prepare("INSERT OR REPLACE INTO mapi_users (id, username, password, qq, email, is_admin) VALUES (1, ?, ?, ?, ?, 0)");
     $stmt->bindValue(1, $username, SQLITE3_TEXT);
     $stmt->bindValue(2, $password, SQLITE3_TEXT);
     $stmt->bindValue(3, $qq, SQLITE3_TEXT);

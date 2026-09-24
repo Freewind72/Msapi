@@ -4,7 +4,7 @@ require __DIR__ . '/../api/relay.php';
 
 // 用户列表
 $users = [];
-$r = $db->query("SELECT id,username,qq,is_admin,expire_at,created_at FROM mapi_users WHERE id<>" . (int)$_SESSION['admin_id'] . " ORDER BY id");
+$r = $db->query("SELECT id,username,qq,is_admin,created_at FROM mapi_users WHERE id<>" . (int)$_SESSION['admin_id'] . " ORDER BY id");
 if ($r) while ($row = $r->fetch_assoc()) $users[] = $row;
 
 if ((($_SESSION['admin_is_admin'] ?? 99) > 1)) { echo '<div class="card"><div class="empty">无权限</div></div>'; return; }
@@ -21,7 +21,6 @@ if ((($_SESSION['admin_is_admin'] ?? 99) > 1)) { echo '<div class="card"><div cl
       <div class="user-name"><?= htmlspecialchars($u['username']) ?> <span class="tag <?= $u['is_admin'] == 0 ? 'tag-super' : ($u['is_admin'] == 1 ? 'tag-admin' : 'tag-user') ?>" style="<?= $u['is_admin'] == 0 ? 'background:rgba(255,215,0,.12);color:#c9a840;font-weight:700' : '' ?>"><?= $u['is_admin'] == 0 ? '超级管理员' : ($u['is_admin'] == 1 ? '管理员' : '用户') ?></span><span class="online-dot" data-uid="<?= $u['id'] ?>" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#b2bec3;margin-left:6px;vertical-align:middle" title="离线"></span></div>
       <div class="user-meta">
         <span>QQ: <?= htmlspecialchars($u['qq'] ?? '-') ?></span>
-        <span>状态: <span class="tag <?= $u['expire_at'] && strtotime($u['expire_at']) >= time() ? 'tag-ok' : 'tag-off' ?>"><?= $u['expire_at'] && strtotime($u['expire_at']) >= time() ? '正常' : '已过期' ?></span></span>
         <span>注册: <?= substr($u['created_at'],0,10) ?></span>
       </div>
     </div>

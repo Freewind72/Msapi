@@ -14,7 +14,6 @@ function get_migrations(): array {
             'autoplay_default' => "TINYINT DEFAULT 0",
             'background'       => "VARCHAR(500) DEFAULT ''",
             'background_url'   => "VARCHAR(500) DEFAULT ''",
-            'expire_at'        => "DATETIME DEFAULT NULL",
             'created_at'       => "DATETIME DEFAULT CURRENT_TIMESTAMP",
         ],
         'mapi_config' => [
