@@ -77,7 +77,6 @@ function http_get(string $url, string $ua, string $referer): ?string
     ]);
     $raw = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     return ($httpCode === 200 && is_string($raw)) ? $raw : null;
 }
 
@@ -100,7 +99,6 @@ function resolve_final_url(string $url, string $ua, string $referer): string
     ]);
     curl_exec($ch);
     $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-    curl_close($ch);
     return $finalUrl ?: $url;
 }
 
@@ -128,7 +126,6 @@ function resolve_play_url(string $id, string $apiBase, string $ua, string $qqRef
     ]);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     $redirectUrl = '';
     if ($httpCode === 302 && is_string($response)) {

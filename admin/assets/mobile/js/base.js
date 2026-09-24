@@ -4,6 +4,7 @@ function showToast(m,t){_toast.textContent=m;_toast.className='show '+(t||'ok');
 var tpill=document.getElementById('topbarPill'),tnav=document.getElementById('topbarNav');
 function moveTopPill(){if(!tpill||!tnav||tnav.offsetParent===null)return;var a=tnav.querySelector('.topbar-nav-item.active');if(!a){tpill.style.display='none';return}var r=a.getBoundingClientRect(),tr=tpill.parentNode.getBoundingClientRect();tpill.style.display='';tpill.style.left=(r.left-tr.left)+'px';tpill.style.top=(r.top-tr.top)+'px';tpill.style.width=r.width+'px';tpill.style.height=r.height+'px'}
 
+var _navigating=false;
 (function(){
 history.scrollRestoration='manual';
 var navActions=['dashboard','keys','users','config','settings','profile','playlist-detail'];
@@ -42,18 +43,20 @@ function loadPageJs(doc,cb){
 function navigateTo(url,push){
   var wrap=document.querySelector('.wrap');
   if(!wrap){window.location.href=url;return}
+  if(_navigating)return;
+  _navigating=true;
   wrap.classList.add('nav-out');
   fetch(url)
-    .then(function(r){if(!r.ok)throw Error('http');return r.text()})
+    .then(function(r){if(!r.ok)throw Error('http '+r.status);return r.text()})
     .then(function(html){
       var doc=new DOMParser().parseFromString(html,'text/html');
       var nw=doc.querySelector('.wrap');
-      if(!nw){wrap.classList.remove('nav-out');window.location.href=url;return}
+      if(!nw){console.error('[navigateTo] .wrap not found, staying on current page. First 200 chars:',html.substring(0,200));wrap.classList.remove('nav-out');_navigating=false;return}
       setTimeout(function(){
         wrap.innerHTML=nw.innerHTML;
         wrap.classList.remove('nav-out');
         wrap.classList.add('nav-in');
-        setTimeout(function(){wrap.classList.remove('nav-in')},420);
+        setTimeout(function(){wrap.classList.remove('nav-in');_navigating=false},420);
         document.title=doc.title;
         var nc=doc.querySelector('#page-css');
         if(nc){var oc=document.querySelector('#page-css');if(oc)oc.href=nc.href}
@@ -74,7 +77,7 @@ function navigateTo(url,push){
         });
       },200);
     })
-    .catch(function(){wrap.classList.remove('nav-out');window.location.href=url});
+    .catch(function(e){console.error('[navigateTo] fetch failed, staying on current page:',e);wrap.classList.remove('nav-out');_navigating=false});
 }
 window.navigateTo=navigateTo;
 
@@ -83,7 +86,7 @@ document.addEventListener('click',function(e){
   if(!link)return;
   var a=new URL(link.href,location.origin).searchParams.get('action');
   if(a==='logout'||navActions.indexOf(a)===-1)return;
-  if(link.classList.contains('active')){e.preventDefault();return;}
+  if(link.classList.contains('active')||_navigating){e.preventDefault();return;}
   e.preventDefault();
   navigateTo(link.href);
 });
