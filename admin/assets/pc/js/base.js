@@ -159,7 +159,7 @@ window.addEventListener('popstate',function(){
 })();
 
 function copyEmbedKey(key){
-  var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/embed.js')+'" key="'+key+'"><\/script>';
+  var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/modules/api.php?route=router')+'" key="'+key+'"><\/script>';
   navigator.clipboard.writeText(code);
 }
 

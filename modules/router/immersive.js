@@ -1,0 +1,166 @@
+(function(MP){
+    if (!MP) return;
+    var _ = MP._;
+
+    MP.toggleImmersive = function() {
+        var ov = MP.$('immersiveOverlay');
+        var tog = MP.$('toggle');
+        if (!ov) return;
+        var btn = MP.$('immersiveBtn');
+        if (btn) {
+            var br = btn.getBoundingClientRect();
+            ov.style.transformOrigin = (br.left + br.width/2) + 'px ' + (br.top + br.height/2) + 'px';
+        }
+        MP._imOpen = !MP._imOpen;
+        if (MP._imOpen) {
+            ov.classList.add('open');
+            if (tog) { tog.style.opacity = '0'; tog.style.pointerEvents = 'none'; }
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+            if (!ov._touchHandler) {
+                ov._touchHandler = function(e){
+                    var t = e.target;
+                    if (t && t.closest && t.closest('[data-mp="imSlist"]')) return;
+                    e.preventDefault();
+                };
+                ov.addEventListener('touchmove', ov._touchHandler, {passive: false});
+            }
+            var lrcPill = document.querySelector('[data-mp="lrc"]');
+            if (lrcPill) lrcPill.style.display = 'none';
+            MP.updateImmersiveUI(); MP.updateImmersivePlayBtn(!MP.ap || !MP.ap.audio || MP.ap.audio.paused ? false : true);
+            MP.updateImmersiveLrc();
+            MP.updateImmersiveModeBtn();
+            var imVol = MP.$('imVol');
+            if (imVol && MP.ap && MP.ap.audio) imVol.value = MP.ap.audio.volume;
+            MP.renderSonglist();
+        } else {
+            ov.classList.remove('open');
+            if (tog) { tog.style.opacity = ''; tog.style.pointerEvents = ''; }
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+            if (ov._touchHandler) {
+                ov.removeEventListener('touchmove', ov._touchHandler);
+                ov._touchHandler = null;
+            }
+            var lrcPill2 = document.querySelector('[data-mp="lrc"]');
+            if (lrcPill2) lrcPill2.style.display = '';
+        }
+    };
+
+    MP.closeImmersive = function() {
+        var ov = MP.$('immersiveOverlay');
+        var tog = MP.$('toggle');
+        if (!ov) return;
+        var btn = MP.$('immersiveBtn');
+        if (btn) {
+            var br = btn.getBoundingClientRect();
+            ov.style.transformOrigin = (br.left + br.width/2) + 'px ' + (br.top + br.height/2) + 'px';
+        }
+        ov.classList.remove('open');
+        MP._imOpen = false;
+        if (tog) { tog.style.opacity = ''; tog.style.pointerEvents = ''; }
+        var lrcPill = document.querySelector('[data-mp="lrc"]');
+        if (lrcPill) lrcPill.style.display = '';
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+        if (ov._touchHandler) {
+            ov.removeEventListener('touchmove', ov._touchHandler);
+            ov._touchHandler = null;
+        }
+    };
+
+    MP.updateImmersiveUI = function() {
+        if (!MP.ap || !MP.ap.list) return;
+        var idx = MP.ap.list.index;
+        var info = MP.ap.list.audios[idx];
+        var titleEl = MP.$('imTitle');
+        var artistEl = MP.$('imArtist');
+        var coverEl = MP.$('imCover');
+        if (titleEl) titleEl.textContent = info ? info.name : '\u672a\u77e5';
+        if (artistEl) artistEl.textContent = info ? (info.artist || '') : '';
+        if (coverEl) { coverEl.src = info && info.cover ? info.cover : ''; }
+        MP.updateImmersiveProgress();
+    };
+
+    MP.updateImmersivePlayBtn = function(playing) {
+        var svg = MP.$('imPlaySvg');
+        if (!svg) return;
+        svg.innerHTML = playing ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' : '<polygon points="6,4 20,12 6,20"/>';
+    };
+
+    MP.updateImmersiveProgress = function() {
+        if (!MP.ap || !MP.ap.audio) return;
+        var a = MP.ap.audio;
+        var cur = a.currentTime||0, dur = a.duration||0;
+        var pct = dur > 0 ? (cur/dur*100) : 0;
+        var pfill = MP.$('imPfill');
+        if (pfill) pfill.style.width = pct + '%';
+        var curEl = MP.$('imCur');
+        var durEl = MP.$('imDur');
+        if (curEl) curEl.textContent = _.fmt(cur);
+        if (durEl) durEl.textContent = dur ? _.fmt(dur) : '00:00';
+    };
+
+    MP.updateImmersiveModeBtn = function() {
+        var svg = MP.$('imModeSvg');
+        if (!svg) return;
+        var icons = {
+            list: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+            single: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><text x="12" y="15" text-anchor="middle" font-size="10" font-weight="700">1</text>',
+            random: '<polyline points="16 3 21 7 16 11"/><polyline points="8 13 3 17 8 21"/><line x1="3" y1="3" x2="21" y2="21"/>'
+        };
+        svg.innerHTML = icons[MP.mode] || icons.list;
+    };
+
+    MP.updateImmersiveLrc = function() {
+        var container = MP.$('imLrc');
+        if (!container) return;
+        var wrap = container.parentElement;
+        if (!MP.lrcLines || MP.lrcLines.length === 0) {
+            try {
+                var _a = MP.ap.list.audios[MP.ap.list.index];
+                if (_a && _a._lrc && _a._lrc.indexOf('\u6b64\u6b4c\u66f2\u4e3a\u6ca1\u6709\u586b\u8bcd\u7684\u7eaf\u97f3\u4e50') >= 0) {
+                    if (wrap) wrap.style.display = '';
+                    container.innerHTML = '<div class="im-lrc-line active">\u6b64\u6b4c\u66f2\u4e3a\u6ca1\u6709\u586b\u8bcd\u7684\u7eaf\u97f3\u4e50\uff0c\u8bf7\u60a8\u6b23\u8d4f</div>';
+                    return;
+                }
+            } catch(e) {}
+            container.innerHTML = '';
+            if (wrap) wrap.style.display = 'none';
+            return;
+        }
+        if (wrap) wrap.style.display = '';
+        var ct = MP.ap ? MP.ap.audio.currentTime : 0;
+        var activeIdx = -1;
+        for (var i = MP.lrcLines.length - 1; i >= 0; i--) {
+            if (ct >= MP.lrcLines[i].time) { activeIdx = i; break; }
+        }
+        if (activeIdx < 0 && MP.lrcLines.length > 0) activeIdx = 0;
+
+        if (container.children.length !== MP.lrcLines.length) {
+            var html = '';
+            for (var j = 0; j < MP.lrcLines.length; j++) {
+                html += '<div class="im-lrc-line">' + _.escapeHtml(MP.lrcLines[j].text) + '</div>';
+            }
+            container.innerHTML = html;
+        }
+
+        for (var k = 0; k < container.children.length; k++) {
+            var cl = 'im-lrc-line';
+            if (k === activeIdx) cl += ' active';
+            else if (k === activeIdx - 1) cl += ' prev';
+            container.children[k].className = cl;
+        }
+
+        if (activeIdx >= 0) {
+            var activeEl = container.children[activeIdx];
+            if (activeEl) {
+                var wrapH = wrap.offsetHeight || 150;
+                var lineH = activeEl.offsetHeight || 30;
+                var offset = activeEl.offsetTop - wrapH / 2 + lineH / 2;
+                container.style.transform = 'translateY(-' + Math.max(0, offset) + 'px)';
+            }
+        }
+    };
+
+})(window.__mapiPlayer);

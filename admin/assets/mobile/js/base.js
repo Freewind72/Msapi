@@ -177,7 +177,7 @@ window.addEventListener('resize',function(){moveTopPill();movePill()});
 (function(){if(tpill){tpill.style.transition='none';moveTopPill();tpill.offsetHeight;tpill.style.transition=''}})();
 
 function copyEmbedKey(key){
-  var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/embed.js')+'" key="'+key+'"><\/script>';
+  var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/modules/api.php?route=router')+'" key="'+key+'"><\/script>';
   navigator.clipboard.writeText(code);
 }
 

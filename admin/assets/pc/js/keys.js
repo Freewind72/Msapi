@@ -13,7 +13,7 @@ function loadTestPlayer(apiKey){
   try{localStorage.setItem('_mapiPlayerKey',apiKey)}catch(e){}
   var s=document.createElement('script');
   s.id='testPlayerScript';
-  s.src=window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/embed.js');
+  s.src=window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/modules/api.php?route=router');
   s.setAttribute('key',apiKey);
   document.body.appendChild(s);
   if(!document.getElementById('testPlayerStyles')){

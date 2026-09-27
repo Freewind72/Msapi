@@ -1,14 +1,19 @@
 <?php
 if (!isset($RELAY)) return;
 $embedJs = $RELAY['asset']['embed_js'];
+// 跨域兼容：相对路径补全为绝对URL，确保嵌入方页面跨域时也能正确加载
+if ($embedJs && $embedJs[0] === '/') {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $embedJs = $scheme . '://' . $_SERVER['HTTP_HOST'] . $embedJs;
+}
 ?>
 <script>
 (function(){
-    var E='<?= $embedJs ?>';
+    var E=<?= json_encode($embedJs) ?>;
     function readCookie(n){try{var m=document.cookie.match('(^| )'+n+'=([^;]+)');return m?decodeURIComponent(m[2]):''}catch(e){return''}}
     function loadPlayer(btn){
         var s=document.createElement('script');
-        s.src=E+'?v=4';
+        s.src=E+(E.indexOf('?')>=0?'&':'?')+'v=4';
         var t=readCookie('mapi_token');
         if(t)s.setAttribute('token',t);
         document.body.appendChild(s);

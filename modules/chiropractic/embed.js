@@ -1,6 +1,13 @@
 (function(){
     'use strict';
 
+// ═══ 强制 UTF-8 编码 ═══
+    (function(){
+        var m = document.createElement('meta');
+        m.setAttribute('charset', 'utf-8');
+        document.head.appendChild(m);
+    })();
+
 // ═══ 禁用宿主页面滚动条 ═══
     var _hideScrollbar = function(){
         var s = document.createElement('style');
@@ -11,7 +18,10 @@
 // ═══ 自动检测脚本所在域名 ═══
     var _SCRIPT_BASE = (function(){
         var s=document.currentScript&&document.currentScript.src;
-        return s?s.substring(0,s.lastIndexOf('/')+1):window.location.origin+'/';
+        if (!s) return window.location.origin+'/';
+        s = s.substring(0, s.lastIndexOf('/') + 1);
+        s = s.replace(/\/modules\/chiropractic\/$/, '/');
+        return s;
     })();
     var API_BASE = (function(){
         var a = document.currentScript && document.currentScript.getAttribute('api');
