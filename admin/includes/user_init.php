@@ -7,9 +7,14 @@ $err = flash_get('err') ?? '';
 
 // 用户配置
 $autoTheme = (int)($_SESSION['admin_auto_theme'] ?? 1);
+// 播放器主题模式（音乐配置页使用）
 $themeMode = $_SESSION['admin_theme_mode'] ?? 'light';
 $lyricsDefault = (int)($_SESSION['admin_lyrics_default'] ?? 1);
 $autoplayDefault = (int)($_SESSION['admin_autoplay_default'] ?? 0);
+// 播放器首次加载位置（side:pct，如 right:88）；空值用内置默认（右侧 88% 高度）
+$playerPos = trim((string)($_SESSION['admin_player_pos'] ?? ''));
+if (!preg_match('/^(left|right):\d{1,3}$/', $playerPos)) $playerPos = 'right:88';
+list($playerPosSide, $playerPosY) = explode(':', $playerPos);
 $isAdmin = $_SESSION['admin_is_admin'] ?? 99;
 
 // Pusher 上线通知

@@ -8,7 +8,36 @@
   var searchToken = P.searchToken;
   var apiBase = P.apiBase;
   var pId = P.pId;
+
+  // 将弹窗移到 body 下, 使其 fixed 定位基于视口, 可覆盖侧边栏
+  ['songModal', 'manualModal', 'editPlModal'].forEach(function(id) {
+    var stale = document.querySelectorAll('body > #' + id);
+    for (var i = 0; i < stale.length; i++) stale[i].remove();
+  });
+  var songModal = document.getElementById('songModal');
+  var manualModal = document.getElementById('manualModal');
+  var editPlModal = document.getElementById('editPlModal');
+  if (songModal) document.body.appendChild(songModal);
+  if (manualModal) document.body.appendChild(manualModal);
+  if (editPlModal) document.body.appendChild(editPlModal);
   var pServer = P.pServer;
+
+  function closeSongModal(modal) {
+    if (!modal || modal.classList.contains('closing')) return;
+    modal.classList.add('closing');
+    var onEnd = function() {
+      modal.removeEventListener('animationend', onEnd);
+      modal.classList.remove('closing');
+      modal.style.display = 'none';
+    };
+    modal.addEventListener('animationend', onEnd);
+    setTimeout(function() {
+      if (modal.style.display !== 'none') {
+        modal.classList.remove('closing');
+        modal.style.display = 'none';
+      }
+    }, 400);
+  }
   var pType = P.pType;
   var plName = P.plName;
   var plCoverMode = P.plCoverMode;
@@ -73,6 +102,44 @@
     t._tid = setTimeout(function() { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(-20px)'; }, 2000);
   }
 
+  // 歌曲排序
+  document.querySelectorAll('.song-ord-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var rowId = this.dataset.rowId, dir = this.dataset.dir;
+      var card = this.closest('.song-card');
+      if (!card || !rowId) return;
+      post('song-reorder', { playlist_id: playlistId, row_id: rowId, dir: dir }, function(r) {
+        toast(r.msg, r.ok);
+        if (!r.ok || !r.order) return;
+        var grid = card.parentNode;
+        if (!grid) return;
+        r.order.forEach(function(id) {
+          var el = grid.querySelector('.song-card[data-row-id="' + id + '"]');
+          if (el) grid.appendChild(el);
+        });
+      });
+    });
+  });
+
+  // 同步远程歌单快照
+  var syncBtn = document.getElementById('syncPlBtn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', function() {
+      var old = syncBtn.textContent;
+      syncBtn.disabled = true;
+      syncBtn.textContent = '同步中…';
+      post('playlist-sync', { id: playlistId }, function(r) {
+        syncBtn.disabled = false;
+        syncBtn.textContent = old;
+        toast(r.msg, r.ok);
+        if (r.ok) setTimeout(function() {
+          if (typeof navigateTo === 'function') navigateTo(location.href, false); else location.reload();
+        }, 900);
+      });
+    });
+  }
+
   document.querySelectorAll('.song-card-remove').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -93,9 +160,6 @@
     });
   });
 
-  var songModal = document.getElementById('songModal');
-  var manualModal = document.getElementById('manualModal');
-
   document.getElementById('openSearchBtn').addEventListener('click', function() {
     document.getElementById('songSearchInput').value = '';
     document.getElementById('songSearchResults').innerHTML = '<div class="song-modal-hint">输入关键词搜索网易云音乐</div>';
@@ -111,12 +175,11 @@
     setTimeout(function() { document.getElementById('manualSongId').focus(); }, 100);
   });
 
-  songModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { stopPreview(); songModal.style.display = 'none'; });
-  songModal.querySelector('.song-modal-close').addEventListener('click', function() { stopPreview(); songModal.style.display = 'none'; });
-  manualModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { manualModal.style.display = 'none'; });
-  manualModal.querySelector('.song-modal-close').addEventListener('click', function() { manualModal.style.display = 'none'; });
+  songModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { stopPreview(); closeSongModal(songModal); });
+  songModal.querySelector('.song-modal-close').addEventListener('click', function() { stopPreview(); closeSongModal(songModal); });
+  manualModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { closeSongModal(manualModal); });
+  manualModal.querySelector('.song-modal-close').addEventListener('click', function() { closeSongModal(manualModal); });
 
-  var editPlModal = document.getElementById('editPlModal');
   if (editPlModal) {
     var editPlName = document.getElementById('editPlName');
     var editPlCoverUrl = document.getElementById('editPlCoverUrl');
@@ -130,8 +193,8 @@
       editPlModal.style.display = 'flex';
       setTimeout(function() { editPlName.focus(); }, 100);
     });
-    editPlModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { editPlModal.style.display = 'none'; });
-    editPlModal.querySelector('.song-modal-close').addEventListener('click', function() { editPlModal.style.display = 'none'; });
+    editPlModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { closeSongModal(editPlModal); });
+    editPlModal.querySelector('.song-modal-close').addEventListener('click', function() { closeSongModal(editPlModal); });
     document.querySelectorAll('input[name="edit_pl_cover"]').forEach(function(r) {
       r.addEventListener('change', function() {
         editPlCoverUrl.style.display = document.querySelector('input[name="edit_pl_cover"][value="url"]').checked ? '' : 'none';
@@ -147,7 +210,7 @@
       xhr.open('POST', '?action=playlist-update', true);
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload = function() {
-        try { var r = JSON.parse(xhr.responseText); toast(r.msg, r.ok); if (r.ok) { editPlModal.style.display = 'none'; setTimeout(function() { if(typeof navigateTo==='function')navigateTo(location.href,false);else location.reload(); }, 500); } } catch(e) { toast('解析失败', false); }
+        try { var r = JSON.parse(xhr.responseText); toast(r.msg, r.ok); if (r.ok) { closeSongModal(editPlModal); setTimeout(function() { if(typeof navigateTo==='function')navigateTo(location.href,false);else location.reload(); }, 500); } } catch(e) { toast('解析失败', false); }
       };
       xhr.onerror = function() { toast('网络错误', false); };
       xhr.send(JSON.stringify(payload));
@@ -231,7 +294,7 @@
     if (!sid || !sn) { toast('ID 和名称必填', false); return; }
     post('song-add', { playlist_id: playlistId, song_id: sid, name: sn, artist: sa, server: sv }, function(r) {
       toast(r.msg, r.ok);
-      if (r.ok) { manualModal.style.display = 'none'; setTimeout(function() { if(typeof navigateTo==='function')navigateTo(location.href,false);else location.reload(); }, 500); }
+      if (r.ok) { closeSongModal(manualModal); setTimeout(function() { if(typeof navigateTo==='function')navigateTo(location.href,false);else location.reload(); }, 500); }
     });
   });
 

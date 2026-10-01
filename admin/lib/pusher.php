@@ -52,9 +52,7 @@ function pusher_trigger(string $channel, string $event, array $data): bool {
     return $http === 202;
 }
 
-/**
- * 生成 Presence Channel 鉴权签名
- */
+// 生成 Presence Channel 鉴权签名
 function pusher_auth(string $socket_id, string $channel_name, string $user_id, array $user_info = []): string {
     $channel_data = json_encode([
         'user_id' => $user_id,
@@ -68,9 +66,7 @@ function pusher_auth(string $socket_id, string $channel_name, string $user_id, a
     ]);
 }
 
-/**
- * 获取当前在线用户列表（通过 Pusher HTTP API）
- */
+// 获取当前在线用户列表 (通过 Pusher HTTP API)
 function pusher_online_users(): array {
     global $RELAY;
     $ch = curl_init($RELAY['api']['pusher_base'] . '/apps/' . PUSHER_APP_ID . '/channels/' . PUSHER_CHANNEL . '/users');

@@ -4,6 +4,37 @@
   if (!D) return;
   var csrf = D.dataset.csrf;
   var activeKeyId = 0;
+  var dragGuardAt = 0;                 // 最近一次拖动的结束时间：拖动后的 click 不当作点击
+
+  // 将弹窗移到 body 下, 使其 fixed 定位基于视口, 可覆盖侧边栏
+  ['createModal', 'editRemoteModal'].forEach(function(id) {
+    if (!document.querySelector('.wrap #' + id)) return;
+    var stale = document.querySelectorAll('body > #' + id);
+    for (var i = 0; i < stale.length; i++) stale[i].remove();
+  });
+  var createModal = document.getElementById('createModal');
+  var editModal = document.getElementById('editRemoteModal');
+  if (!createModal || !editModal) return;      // 弹窗不存在就别继续，免得后面报错
+  if (createModal.parentElement !== document.body) document.body.appendChild(createModal);
+  if (editModal.parentElement !== document.body) document.body.appendChild(editModal);
+  function $(id) { return document.getElementById(id); }   // 弹窗已移到 body、ID 唯一，直接按 ID 取
+
+  function closeSongModal(modal) {
+    if (!modal || modal.classList.contains('closing')) return;
+    modal.classList.add('closing');
+    var onEnd = function() {
+      modal.removeEventListener('animationend', onEnd);
+      modal.classList.remove('closing');
+      modal.style.display = 'none';
+    };
+    modal.addEventListener('animationend', onEnd);
+    setTimeout(function() {
+      if (modal.style.display !== 'none') {
+        modal.classList.remove('closing');
+        modal.style.display = 'none';
+      }
+    }, 400);
+  }
 
   function apiPost(action, data, cb) {
     data._csrf = csrf;
@@ -56,7 +87,6 @@
     });
   });
 
-  var createModal = document.getElementById('createModal');
   document.querySelectorAll('.playlist-card-add').forEach(function(btn) {
     btn.addEventListener('click', function() {
       activeKeyId = parseInt(this.dataset.keyId);
@@ -72,13 +102,13 @@
     });
   });
 
-  createModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { createModal.style.display = 'none'; });
-  createModal.querySelector('.song-modal-close').addEventListener('click', function() { createModal.style.display = 'none'; });
+  createModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { closeSongModal(createModal); });
+  createModal.querySelector('.song-modal-close').addEventListener('click', function() { closeSongModal(createModal); });
 
-  document.querySelectorAll('input[name="create_type"]').forEach(function(r) {
+  createModal.querySelectorAll('input[name="create_type"]').forEach(function(r) {
     r.addEventListener('change', toggleCreateType);
   });
-  document.querySelectorAll('input[name="create_cover"]').forEach(function(r) {
+  createModal.querySelectorAll('input[name="create_cover"]').forEach(function(r) {
     r.addEventListener('change', toggleCoverFields);
   });
 
@@ -113,7 +143,7 @@
     apiPost('playlist-create', data, function(r) {
       toast(r.msg, r.ok);
       if (r.ok) {
-        createModal.style.display = 'none';
+        closeSongModal(createModal);
         if (type === 'custom' && r.id) {
           if(typeof navigateTo==='function')navigateTo('?action=playlist-detail&id='+r.id);else location.href='?action=playlist-detail&id='+r.id;
         } else {
@@ -123,10 +153,10 @@
     });
   });
 
-  var editModal = document.getElementById('editRemoteModal');
   document.querySelectorAll('.playlist-card-remote').forEach(function(card) {
     card.addEventListener('click', function(e) {
       if (e.target.closest('.playlist-card-delete')) return;
+      if (Date.now() - dragGuardAt < 600) return;                      // 刚拖动过：不要顺手弹出编辑框
       document.getElementById('editPlId').value = this.dataset.plId;
       document.getElementById('editName').value = this.dataset.plName;
       document.getElementById('editRemoteId').value = this.dataset.remoteId;
@@ -140,10 +170,10 @@
     });
   });
 
-  editModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { editModal.style.display = 'none'; });
-  editModal.querySelector('.song-modal-close').addEventListener('click', function() { editModal.style.display = 'none'; });
+  editModal.querySelector('.song-modal-backdrop').addEventListener('click', function() { closeSongModal(editModal); });
+  editModal.querySelector('.song-modal-close').addEventListener('click', function() { closeSongModal(editModal); });
 
-  document.querySelectorAll('input[name="edit_cover"]').forEach(function(r) {
+  editModal.querySelectorAll('input[name="edit_cover"]').forEach(function(r) {
     r.addEventListener('change', function() {
       document.getElementById('editCoverUrl').style.display = document.querySelector('input[name="edit_cover"][value="url"]').checked ? '' : 'none';
     });
@@ -178,4 +208,131 @@
       }
     });
   });
+  /* ---------- 密钥歌单：左右拖动排序（松手自动保存，播放器歌单顺序同步） ---------- */
+  (function () {
+    var grids = document.querySelectorAll('.playlist-grid[data-key-id]');
+    if (!grids.length) return;
+
+    // 拖动时的视觉样式（注入式，避免改动公共样式文件；脚本可能被重新执行，只注入一次）
+    if (!document.getElementById('mapi-pl-drag-style')) {
+      var st = document.createElement('style');
+      st.id = 'mapi-pl-drag-style';
+      st.textContent = '.playlist-card[data-pl-id]{touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}' +
+        '.playlist-card[data-pl-id] img{-webkit-user-drag:none;user-drag:none;pointer-events:none}' +
+        '.playlist-card.pl-dragging{z-index:6;transition:none!important;box-shadow:0 8px 22px rgba(0,0,0,.18);opacity:.94;cursor:grabbing}' +
+        '.playlist-card.pl-dragging:hover{transform:none}' +
+        '.playlist-grid.pl-sorting{cursor:grabbing;user-select:none}';
+      document.head.appendChild(st);
+    }
+
+    function cardsOf(grid) { return [].slice.call(grid.querySelectorAll('.playlist-card[data-pl-id]')); }
+    function orderOf(grid) { return cardsOf(grid).map(function (c) { return c.dataset.plId; }); }
+
+    grids.forEach(function (grid) {
+      var card = null, startX = 0, startY = 0, grabDX = 0, cardW = 0, slots = [], origIndex = -1,
+          dragging = false, movedFar = false, orderBefore = '', justDragged = 0, listening = false;
+
+      // 关键：浏览器默认把封面图片/链接当作可拖拽元素，原生拖放会触发 pointercancel 打断我们的拖动，全部禁掉
+      [].slice.call(grid.querySelectorAll('img')).forEach(function (im) { im.draggable = false; });
+      grid.addEventListener('dragstart', function (e) { e.preventDefault(); e.stopPropagation(); });
+      grid.addEventListener('mousedown', function (e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest('.playlist-card-delete')) return;
+        if (t.closest('.playlist-card[data-pl-id]')) e.preventDefault();   // 阻止原生拖拽与文字选中（点击仍然照常触发）
+      });
+
+      function onMove(e) {
+        if (!card) return;
+        var dx = e.clientX - startX, dy = e.clientY - startY;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) movedFar = true;        // 移动过就不算点击（避免竖滑误进歌单）
+        if (!dragging) {
+          if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+          if (Math.abs(dy) > Math.abs(dx)) { if (movedFar) { justDragged = Date.now(); dragGuardAt = justDragged; } card = null; stopListen(); return; }  // 只允许左右拖：纵向手势放弃（且不算点击）
+          dragging = true;
+          card.classList.add('pl-dragging');
+          grid.classList.add('pl-sorting');
+        }
+        if (e.cancelable) e.preventDefault();
+
+        // 1) 卡片始终贴着光标走（保持按下时的抓取偏移）
+        var wantLeft = e.clientX - grabDX;
+        var center = wantLeft + cardW / 2;
+
+        // 2) 只在同一排内比较：哪一格的中心离卡片中心最近就去哪一格（越过邻居中心才换位，不会乱跳）
+        var rowTop = slots[origIndex] ? slots[origIndex].top : 0;
+        var best = origIndex, bestDist = Infinity;
+        for (var i = 0; i < slots.length; i++) {
+          if (Math.abs(slots[i].top - rowTop) > 2) continue;              // 不同排不参与（只允许左右拖）
+          var d = Math.abs(slots[i].centerX - center);
+          if (d < bestDist) { bestDist = d; best = i; }
+        }
+        var sibs = cardsOf(grid), cur = sibs.indexOf(card);
+        if (best !== cur) {
+          if (best > cur) grid.insertBefore(card, sibs[best].nextSibling);
+          else grid.insertBefore(card, sibs[best]);
+          var addBtn = grid.querySelector('.playlist-card-add');
+          if (addBtn) grid.appendChild(addBtn);                          // “添加歌单”始终排在最后
+        }
+        // 3) 落在新格子后重新算位移，保证卡片依旧在光标下（拖动全程不保存）
+        card.style.transform = 'translateX(' + (wantLeft - slots[best].left) + 'px)';
+      }
+
+      function stopListen() {
+        if (!listening) return;
+        listening = false;
+        document.removeEventListener('pointermove', onMove, true);
+        document.removeEventListener('pointerup', onUp, true);
+        document.removeEventListener('pointercancel', onUp, true);
+      }
+
+      // 只有抬手（松手）才结束拖动并保存一次；拖动过程中的换位不写库
+      function onUp() {
+        stopListen();
+        if (movedFar) { justDragged = Date.now(); dragGuardAt = justDragged; }   // 动过了：这次抬起不当作点击
+        if (!card) return;
+        var c = card; card = null;
+        c.style.transform = '';
+        c.classList.remove('pl-dragging');
+        grid.classList.remove('pl-sorting');
+        if (!dragging) return;
+        dragging = false;
+        var order = orderOf(grid);
+        if (order.join(',') === orderBefore) return;                    // 顺序没变就不发请求
+        apiPost('playlist-reorder', { key_id: grid.dataset.keyId, order: order }, function (r) {
+          toast((r && r.ok) ? '歌单顺序已保存' : ((r && r.msg) || '顺序保存失败'), !!(r && r.ok));
+        });
+      }
+
+      grid.addEventListener('pointerdown', function (e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        if (e.target.closest && e.target.closest('.playlist-card-delete')) return;
+        var c = e.target.closest ? e.target.closest('.playlist-card[data-pl-id]') : null;
+        if (!c) return;
+        card = c; startX = e.clientX; startY = e.clientY; dragging = false; movedFar = false;
+        var r = c.getBoundingClientRect();
+        grabDX = e.clientX - r.left; cardW = r.width;
+        var all = cardsOf(grid);
+        // 记住每一格的几何位置: 横向用 rect (悬停只有纵向位移) , 纵向用 offsetTop (不受 hover/拖动的 transform 影响) ,
+        slots = all.map(function (el) {
+          var b = el.getBoundingClientRect();
+          return { left: b.left, top: el.offsetTop, centerX: b.left + b.width / 2 };
+        });
+        origIndex = all.indexOf(c);
+        orderBefore = orderOf(grid).join(',');
+        // 用 document 级监听：卡片在换位时会被重新插入 DOM，pointer capture 会因此丢失（那会导致“挪一格就结束”）
+        if (!listening) {
+          listening = true;
+          document.addEventListener('pointermove', onMove, true);
+          document.addEventListener('pointerup', onUp, true);
+          document.addEventListener('pointercancel', onUp, true);
+        }
+      });
+
+      // 拖动过之后抑制这一次点击（自建歌单卡片本身是链接，SPA 在 document 冒泡阶段接管跳转）
+      grid.addEventListener('click', function (e) {
+        if (justDragged && Date.now() - justDragged < 600) { e.preventDefault(); e.stopPropagation(); }
+      }, true);
+    });
+  })();
 })();

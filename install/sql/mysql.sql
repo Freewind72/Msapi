@@ -1,3 +1,5 @@
+-- 表结构唯一来源；变更方式与注意事项见 install/schema.md
+
 -- mapi_users
 CREATE TABLE IF NOT EXISTS `mapi_users` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -8,8 +10,10 @@ CREATE TABLE IF NOT EXISTS `mapi_users` (
     `is_admin` TINYINT DEFAULT 0,
     `auto_theme` TINYINT DEFAULT 1,
     `theme_mode` VARCHAR(10) DEFAULT 'light',
+    `admin_theme` VARCHAR(10) DEFAULT 'light',
     `lyrics_default` TINYINT DEFAULT 1,
     `autoplay_default` TINYINT DEFAULT 0,
+    `player_pos` VARCHAR(24) DEFAULT '',
     `background` VARCHAR(500) DEFAULT '',
     `background_url` VARCHAR(500) DEFAULT '',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -141,11 +145,24 @@ CREATE TABLE IF NOT EXISTS `mapi_playlists` (
     `remote_id` VARCHAR(100) DEFAULT '',
     `server` VARCHAR(20) DEFAULT 'netease',
     `cover_url` VARCHAR(500) DEFAULT '',
+    `cover_data` MEDIUMTEXT,
     `cover_mode` VARCHAR(20) DEFAULT 'auto',
     `sort_order` INT DEFAULT 0,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `cover_updated_at` DATETIME DEFAULT NULL,
     PRIMARY KEY (`id`),
     KEY `idx_key_id` (`key_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `mapi_song_covers` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `song_ref` VARCHAR(191) NOT NULL DEFAULT '',
+    `key_id` INT NOT NULL DEFAULT 0,
+    `cover_url` VARCHAR(500) DEFAULT '',
+    `cover_data` MEDIUMTEXT,
+    `updated_at` DATETIME DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uniq_song_covers_ref` (`song_ref`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `mapi_songs` (
@@ -157,6 +174,7 @@ CREATE TABLE IF NOT EXISTS `mapi_songs` (
     `artist` VARCHAR(255) DEFAULT '',
     `server` VARCHAR(20) DEFAULT 'netease',
     `sort_order` INT DEFAULT 0,
+    `missing` TINYINT NOT NULL DEFAULT 0,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_playlist_id` (`playlist_id`),

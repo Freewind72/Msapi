@@ -11,8 +11,8 @@ $loginActions = ['', 'register', 'get-avatar', 'pk-login-begin', 'pk-login-compl
 // action 白名单
 $allowed = [
     'dashboard','keys','keys-create','keys-delete','playlist-detail',
-    'playlist-create','playlist-delete','playlist-update','playlist-update-cover','playlist-fetch-cover',
-    'song-add','song-remove',
+    'playlist-create','playlist-delete','playlist-update','playlist-update-cover','playlist-fetch-cover','playlist-reorder','playlist-sync',
+    'song-add','song-remove','song-reorder',
     'users','user-delete','user-admin',
     'profile','config','settings',
     'pk-begin','pk-complete','pk-delete',
@@ -36,9 +36,12 @@ $apiHandlers = [
     'playlist-update'      => ['handlers/playlists.php', true],
     'playlist-update-cover'=> ['handlers/playlists.php', true],
     'playlist-fetch-cover' => ['handlers/playlists.php', true],
+    'playlist-reorder'     => ['handlers/playlists.php', true],
+    'playlist-sync'        => ['handlers/playlists.php', true],
 
     'song-add'             => ['handlers/songs.php', true],
     'song-remove'          => ['handlers/songs.php', true],
+    'song-reorder'         => ['handlers/songs.php', true],
 
     'user-delete'          => ['handlers/users_mgmt.php', true],
     'user-admin'           => ['handlers/users_mgmt.php', true],

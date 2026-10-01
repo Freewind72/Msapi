@@ -32,6 +32,10 @@ $navItems = [
     'config' => ['label' => '配置', 'icon' => svg('config')],
     'settings' => ['label' => '设置', 'icon' => svg('srv')],
 ];
+// 人员与设置仅管理员可见（顶部、侧边栏、底部导航共用这一份过滤）
+if ((($_SESSION['admin_is_admin'] ?? 99) > 1)) {
+    unset($navItems['users'], $navItems['settings']);
+}
 
 function formatBytes($b) {
     if ($b < 1024) return $b . 'B';
@@ -61,7 +65,8 @@ header('Cache-Control: no-store, private');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
-$themeMode = $_SESSION['admin_theme_mode'] ?? 'light';
+// 后台界面主题
+$adminUiTheme = $_SESSION['admin_ui_theme'] ?? 'light';
 $bgStyle = '';
 $bgVideoUrl = '';
 $bgVideoExt = '';
@@ -97,9 +102,9 @@ if (!$bgVideoUrl && !$bgStyle && !empty($_SESSION['admin_background']) && functi
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>顺雅管理 · <?= $action === 'profile' ? '个人资料' : ($action === 'playlist-detail' ? '歌单详情' : htmlspecialchars($navItems[$action]['label'] ?? '')) ?></title>
 <?php $device = $isMobile ? 'mobile' : 'pc'; ?>
-<link rel="stylesheet" href="<?= str_replace('{device}', $device, $RELAY['page']['base_css']) ?>">
+<link rel="stylesheet" href="<?= asset_ver(str_replace('{device}', $device, $RELAY['page']['base_css'])) ?>">
 <?php $pageCssKey = $action . '_css'; if (isset($RELAY['page'][$pageCssKey])): ?>
-<link id="page-css" rel="stylesheet" href="<?= str_replace('{device}', $device, $RELAY['page'][$pageCssKey]) ?>">
+<link id="page-css" rel="stylesheet" href="<?= asset_ver(str_replace('{device}', $device, $RELAY['page'][$pageCssKey])) ?>">
 <?php endif; ?>
 <link rel="stylesheet" href="<?= $RELAY['cm']['core_css'] ?>">
 <link rel="stylesheet" href="<?= $RELAY['cm']['theme_monokai'] ?>">
@@ -110,9 +115,9 @@ if (!$bgVideoUrl && !$bgStyle && !empty($_SESSION['admin_background']) && functi
 <script src="<?= $RELAY['cm']['mode_js'] ?>"></script>
 <script src="<?= $RELAY['cm']['mode_html'] ?>"></script>
 <script src="<?= $RELAY['cm']['addon_activeline'] ?>"></script>
-<script>window.RELAY=<?= json_encode($RELAY['asset']) ?>;</script>
+<script>window.RELAY=<?= json_encode($RELAY['asset']) ?>;window.__mapiPrefetchConcurrency=<?= (strpos((string)($_SERVER['SERVER_SOFTWARE'] ?? ''), 'Development Server') !== false) ? 1 : 3 ?>;</script>
 </head>
-<body data-device="<?= $isMobile ? 'mobile' : 'pc' ?>" data-theme="<?= $themeMode ?>" style="<?= $bgStyle ?>">
+<body data-device="<?= $isMobile ? 'mobile' : 'pc' ?>" data-theme="<?= $adminUiTheme ?>" style="<?= $bgStyle ?>">
 <?php if ($bgVideoUrl): ?>
 <video class="bg-video" autoplay muted loop playsinline><source src="<?= htmlspecialchars($bgVideoUrl) ?>" type="video/<?= $bgVideoExt ?>"></video>
 <?php endif; ?>
@@ -120,8 +125,7 @@ if (!$bgVideoUrl && !$bgStyle && !empty($_SESSION['admin_background']) && functi
 <div class="topbar" id="topbar">
   <span class="topbar-title">顺雅管理</span>
   <nav class="topbar-nav" id="topbarNav">
-    <span class="topbar-pill" id="topbarPill"></span>
-<?php foreach ($navItems as $k => $item): if (($k === 'settings' || $k === 'users') && (($_SESSION['admin_is_admin'] ?? 99) > 1)) continue; ?>
+<?php foreach ($navItems as $k => $item): ?>
     <a href="?action=<?= $k ?>" class="topbar-nav-item<?= $k === $action ? ' active' : '' ?>">
       <span class="topbar-nav-icon"><?= $item['icon'] ?></span>
       <span class="topbar-nav-label"><?= $item['label'] ?></span>
@@ -142,7 +146,7 @@ if (!$bgVideoUrl && !$bgStyle && !empty($_SESSION['admin_background']) && functi
     <span class="sidebar-title">顺雅管理</span>
   </div>
   <nav class="sidebar-nav" id="sidebarNav">
-<?php foreach ($navItems as $k => $item): if (($k === 'settings' || $k === 'users') && (($_SESSION['admin_is_admin'] ?? 99) > 1)) continue; ?>
+<?php foreach ($navItems as $k => $item): ?>
     <a href="?action=<?= $k ?>" class="sb-item<?= $k === $action ? ' active' : '' ?>">
       <span class="sb-icon"><?= $item['icon'] ?></span>
       <span class="sb-label"><?= $item['label'] ?></span>

@@ -1,13 +1,6 @@
 <?php
 
-/**
- * API 配置读取器 — 从数据库 mapi_config 表统一读取 MAPI API 配置
- * 消除 admin/api/api.php、qq_api.php、wy_api.php、admin/index.php 中 4 处重复代码
- *
- * @param object|null $db  数据库连接对象
- * @param array       $CFG 基础配置数组（作为默认值回退）
- * @return array 规范化后的 API 配置数组
- */
+// API 配置读取器 — 从数据库 mapi_config 表统一读取 MAPI API 配置
 function read_mapi_api_config($db, array $CFG): array
 {
     $config = [

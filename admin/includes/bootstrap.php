@@ -1,6 +1,7 @@
 <?php
 
-// 加载配置与会话初始化
+set_time_limit(30);
+
 $cfg = require $configFile;
 date_default_timezone_set('Asia/Shanghai');
 require __DIR__ . '/../../assets/lib/jwt.php';
@@ -33,6 +34,8 @@ require __DIR__ . '/../lib/mail.php';
 require __DIR__ . '/../lib/webauthn.php';
 require __DIR__ . '/../lib/s3.php';
 require __DIR__ . '/../lib/pusher.php';
+require __DIR__ . '/../lib/upstream_api.php';
+require __DIR__ . '/../lib/upstream_snapshot.php';
 
 // 从数据库读取 API 配置
 if (!empty($db) && empty($db->connect_error) && empty($db->_error)) {
@@ -44,6 +47,9 @@ if (!empty($db) && empty($db->connect_error) && empty($db->_error)) {
 if (empty($db) || !empty($db->connect_error) || !empty($db->_error)) {
     require __DIR__ . '/../handlers/db_error.php';
 }
+
+// 封面存储初始化：首次运行自动建列/建表，并把旧的 JSON 封面缓存迁移进数据库（幂等）
+cover_store_ensure($db);
 
 // 加载当前用户角色
 if (!empty($_SESSION['admin_id'])) {

@@ -1,14 +1,8 @@
 <?php
 
-/**
- * 共享工具函数库
- * 提供限流、HTTP 请求、JSON 响应等复用工具
- */
+// 共享工具函数库
 
-/**
- * 文件限流检查 — 基于临时文件的轻量限流
- * 成功返回 true，超限设置 429 后 exit。
- */
+// 文件限流检查 — 基于临时文件的轻量限流
 function rate_limit_check(string $prefix, int $max_requests, int $window_seconds): void
 {
     $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -36,9 +30,7 @@ function rate_limit_check(string $prefix, int $max_requests, int $window_seconds
     }
 }
 
-/**
- * 登录限流 — 独立于通用限流，窗口更长
- */
+// 登录限流 — 独立于通用限流, 窗口更长
 function login_rate_limit(): void
 {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -60,29 +52,26 @@ function login_rate_limit(): void
     }
 }
 
-/**
- * HTTP GET 请求 — 使用 cURL
- */
+// HTTP GET 请求 — 使用 cURL
 function http_get(string $url, string $ua, string $referer): ?string
 {
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_CONNECTTIMEOUT => 3,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_USERAGENT      => $ua,
         CURLOPT_REFERER        => $referer,
+        CURLOPT_TCP_NODELAY    => true,
     ]);
     $raw = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     return ($httpCode === 200 && is_string($raw)) ? $raw : null;
 }
 
-/**
- * 遵循重定向获取最终 URL
- */
+// 遵循重定向获取最终 URL
 function resolve_final_url(string $url, string $ua, string $referer): string
 {
     $ch = curl_init();
@@ -102,9 +91,7 @@ function resolve_final_url(string $url, string $ua, string $referer): string
     return $finalUrl ?: $url;
 }
 
-/**
- * 解析播放地址（获取重定向 URL）
- */
+// 解析播放地址 (获取重定向 URL)
 function resolve_play_url(string $id, string $apiBase, string $ua, string $qqRef, string $server, string $rServer, string $rType, string $rId): string
 {
     $url = Uri\Rfc3986\Uri::parse($apiBase)
@@ -115,14 +102,15 @@ function resolve_play_url(string $id, string $apiBase, string $ua, string $qqRef
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT        => 8,
+        CURLOPT_CONNECTTIMEOUT => 3,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_USERAGENT      => $ua,
         CURLOPT_REFERER        => $qqRef,
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_HEADER         => true,
         CURLOPT_NOBODY         => false,
+        CURLOPT_TCP_NODELAY    => true,
     ]);
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -142,9 +130,7 @@ function resolve_play_url(string $id, string $apiBase, string $ua, string $qqRef
     return $redirectUrl;
 }
 
-/**
- * 封面 URL 解析 — 相对路径转绝对路径
- */
+// 封面 URL 解析 — 相对路径转绝对路径
 function resolve_cover_url(string $pic, string $apiBase, string $server, string $pId, string $rServer, string $rType): string
 {
     if (!$pic) {
@@ -163,10 +149,7 @@ function resolve_cover_url(string $pic, string $apiBase, string $server, string 
     return '';
 }
 
-/**
- * JSON 输出并退出
- * 可选传入数据库对象用于请求日志记录，不传则仅输出 JSON
- */
+// JSON 输出并退出
 #[NoReturn]
 function json_ok(mixed $data, string $action = '', string $id = '', string $apiKey = '', $dbLog = null): never
 {
@@ -188,4 +171,17 @@ function json_ok(mixed $data, string $action = '', string $id = '', string $apiK
         }
     }
     exit;
+}
+
+// 给本地静态资源追加修改时间做版本号（前后台共用）：页面/样式/脚本变更后浏览器自动拿到新文件
+if (!function_exists('asset_ver')) {
+    function asset_ver(string $path): string
+    {
+        if ($path === '' || strpos($path, '://') !== false) return $path;
+        $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        if ($docRoot === '' || $path[0] !== '/') return $path;
+        $local = $docRoot . str_replace('/', DIRECTORY_SEPARATOR, $path);
+        if (!is_file($local)) return $path;
+        return $path . (strpos($path, '?') === false ? '?' : '&') . 'v=' . filemtime($local);
+    }
 }

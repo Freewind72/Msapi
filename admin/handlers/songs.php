@@ -25,43 +25,81 @@ if ($action_key === 'song-add') {
     $stmt->bind_param('iissssi', $plKeyId, $plId, $songId, $name, $artist, $server, $nextOrder);
     $ok = $stmt->execute();
     if ($ok) {
-        $apiBase = $cfg['api']['base_url'] ?? '';
-        $rServer = $cfg['api']['param_server'] ?? 'server';
-        $rType = $cfg['api']['param_type'] ?? 'type';
-        $pId = $cfg['api']['param_id'] ?? 'id';
-        if ($apiBase) {
-            $songPicUrl = $apiBase . '?' . http_build_query([$rServer => $server, $rType => 'pic', $pId => $songId]);
-            $cUser = cover_resolve_user($db, $plId);
-            cover_fetch_and_cache($songPicUrl, $_songCoverFile, $cUser, $server . '_' . $songId);
-        }
-        if ($nextOrder === 1) {
-            $coverCheck = $db->query("SELECT cover_mode, cover_url FROM mapi_playlists WHERE id=$plId");
-            if ($coverCheck) {
-                $coverRow = $coverCheck->fetch_assoc();
-                if ($coverRow && in_array($coverRow['cover_mode'], ['auto', 'first_song']) && empty($coverRow['cover_url'])) {
-                    $fPic = $cfg['api']['field_pic'] ?? 'pic';
-                    $rId = $cfg['api']['param_id'] ?? 'id';
-                    if ($apiBase) {
-                        $fetchUrl = $apiBase . '?' . http_build_query([$rServer => $server, $rType => 'song', $rId => $songId]);
-                        $raw = @file_get_contents($fetchUrl);
-                        if ($raw) {
-                            $songData = json_decode($raw, true);
-                            $songData = is_array($songData) ? ($songData[0] ?? $songData) : null;
-                            if ($songData && !empty($songData[$fPic])) {
-                                $coverUrl = resolve_cover_url($songData[$fPic], $apiBase, $server, $pId, $rServer, $rType);
-                                if ($coverUrl) {
-                                    $picEsc = $db->real_escape_string($coverUrl);
-                                    $db->query("UPDATE mapi_playlists SET cover_url='$picEsc' WHERE id=$plId");
-                                    cover_fetch_and_cache($coverUrl, $_plCoverFile, $cUser ?? cover_resolve_user($db, $plId), (string)$plId);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // 新增歌曲属于“重大改动”：这首歌的封面写库；如果它是歌单第一首/最后一首，歌单封面也自动更新
+        cover_song_refresh($db, $cfg, $server, $songId, $plKeyId);
+        cover_pl_refresh($db, $cfg, $plId, false);
     }
     echo json_encode(['ok' => $ok, 'msg' => $ok ? '已添加' : '添加失败']);
+    exit;
+}
+
+// 歌曲排序：单首移动或整份顺序
+if ($action_key === 'song-reorder') {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) $input = $_POST;
+    $_POST['_csrf'] = $input['_csrf'] ?? '';
+    csrf_require();
+    $plId  = (int)($input['playlist_id'] ?? 0);
+    $rowId = (int)($input['row_id'] ?? 0);
+    $dir   = (string)($input['dir'] ?? '');
+    $order = $input['order'] ?? null;
+    if (!$plId) { echo json_encode(['ok' => false, 'msg' => '参数不完整']); exit; }
+
+    $ownerCheck = ($_SESSION['admin_is_admin'] ?? 99) <= 1
+        ? $db->query("SELECT id FROM mapi_playlists WHERE id=$plId")
+        : $db->query("SELECT id FROM mapi_playlists WHERE id=$plId AND key_id IN (SELECT id FROM mapi_keys WHERE user_id=" . (int)$_SESSION['admin_id'] . ")");
+    if (!$ownerCheck || !$ownerCheck->fetch_assoc()) { echo json_encode(['ok' => false, 'msg' => '无权限']); exit; }
+
+    $rows = [];
+    $r = $db->query("SELECT id FROM mapi_songs WHERE playlist_id=$plId ORDER BY sort_order ASC, id ASC");
+    if ($r) while ($x = $r->fetch_assoc()) $rows[] = (int)$x['id'];
+    if (!$rows) { echo json_encode(['ok' => false, 'msg' => '歌单为空']); exit; }
+
+    if (is_array($order) && $order) {
+        $want = [];
+        foreach ($order as $id) {
+            $id = (int)$id;
+            if (in_array($id, $rows, true) && !in_array($id, $want, true)) $want[] = $id;
+        }
+        // 以服务端清单为准补全
+        foreach ($rows as $id) { if (!in_array($id, $want, true)) $want[] = $id; }
+    } else {
+        $pos = array_search($rowId, $rows, true);
+        if ($pos === false) { echo json_encode(['ok' => false, 'msg' => '歌曲不在该歌单']); exit; }
+        $want = $rows;
+        if ($dir === 'top') {
+            if ($pos === 0) { echo json_encode(['ok' => true, 'msg' => '已在最前', 'order' => $rows, 'moved' => 0]); exit; }
+            array_splice($want, $pos, 1);
+            array_unshift($want, $rowId);
+        } elseif ($dir === 'up') {
+            if ($pos === 0) { echo json_encode(['ok' => true, 'msg' => '已在最前', 'order' => $rows, 'moved' => 0]); exit; }
+            $want[$pos] = $want[$pos - 1]; $want[$pos - 1] = $rowId;
+        } elseif ($dir === 'down') {
+            if ($pos >= count($want) - 1) { echo json_encode(['ok' => true, 'msg' => '已在最后', 'order' => $rows, 'moved' => 0]); exit; }
+            $want[$pos] = $want[$pos + 1]; $want[$pos + 1] = $rowId;
+        } else {
+            echo json_encode(['ok' => false, 'msg' => '参数不完整']); exit;
+        }
+    }
+
+    // 开启事务
+    $db->query('START TRANSACTION');
+    try {
+        $upd = $db->prepare("UPDATE mapi_songs SET sort_order=? WHERE id=? AND playlist_id=?");
+        $moved = 0;
+        foreach ($want as $i => $id) {
+            $newOrder = ($i + 1) * 100;
+            $upd->bind_param('iii', $newOrder, $id, $plId);
+            $upd->execute();
+            if ($upd->affected_rows > 0) $moved++;
+        }
+        $db->query('COMMIT');
+    } catch (Throwable $e) {
+        $db->query('ROLLBACK');
+        error_log('MAPI: 歌曲排序失败: ' . $e->getMessage());
+        echo json_encode(['ok' => false, 'msg' => '保存失败']); exit;
+    }
+    echo json_encode(['ok' => true, 'msg' => '顺序已保存', 'order' => $want, 'moved' => $moved]);
     exit;
 }
 
@@ -71,20 +109,29 @@ if ($action_key === 'song-remove') {
     $sid = (int)($_POST['song_row_id'] ?? 0);
     if (!$sid) { echo json_encode(['ok' => false, 'msg' => '参数不完整']); exit; }
     if (($_SESSION['admin_is_admin'] ?? 99) <= 1) {
-        $songInfo = $db->query("SELECT song_id, server FROM mapi_songs WHERE id=$sid");
+        $songInfo = $db->query("SELECT song_id, server, playlist_id FROM mapi_songs WHERE id=$sid");
         $stmt = $db->prepare("DELETE FROM mapi_songs WHERE id=?");
         $stmt->bind_param('i', $sid);
     } else {
-        $songInfo = $db->query("SELECT song_id, server FROM mapi_songs WHERE id=$sid AND playlist_id IN (SELECT id FROM mapi_playlists WHERE key_id IN (SELECT id FROM mapi_keys WHERE user_id=" . (int)$_SESSION['admin_id'] . "))");
+        $songInfo = $db->query("SELECT song_id, server, playlist_id FROM mapi_songs WHERE id=$sid AND playlist_id IN (SELECT id FROM mapi_playlists WHERE key_id IN (SELECT id FROM mapi_keys WHERE user_id=" . (int)$_SESSION['admin_id'] . "))");
         $stmt = $db->prepare("DELETE FROM mapi_songs WHERE id=? AND playlist_id IN (SELECT id FROM mapi_playlists WHERE key_id IN (SELECT id FROM mapi_keys WHERE user_id=?))");
         $stmt->bind_param('ii', $sid, $_SESSION['admin_id']);
     }
+    // 删除前先记下这首歌的信息（删完就查不到了）
+    $si = ($songInfo && ($row = $songInfo->fetch_assoc())) ? $row : null;
     $ok = $stmt->execute();
-    if ($ok && $songInfo && ($si = $songInfo->fetch_assoc())) {
-        $cacheKey = ($si['server'] ?? 'netease') . '_' . ($si['song_id'] ?? '');
-        $plOwner = $db->query("SELECT u.username FROM mapi_songs s LEFT JOIN mapi_playlists p ON s.playlist_id=p.id LEFT JOIN mapi_keys k ON p.key_id=k.id LEFT JOIN mapi_users u ON k.user_id=u.id WHERE s.id=$sid");
-        $cUser = ($plOwner && $po = $plOwner->fetch_assoc()) ? ($po['username'] ?? 'unknown') : 'unknown';
-        if ($cacheKey) cover_cache_unset($_songCoverFile, $cUser, $cacheKey);
+    if ($ok && $si) {
+        $refServer = $si['server'] ?: 'netease';
+        $refSongId = (string)($si['song_id'] ?? '');
+        // 删歌属于“重大改动”：该歌若已无其它歌单引用就清掉封面；歌单封面按规则自动更新
+        if ($refSongId !== '') {
+            $songEsc = $db->real_escape_string($refSongId);
+            $srvEsc = $db->real_escape_string($refServer);
+            $still = $db->query("SELECT COUNT(*) n FROM mapi_songs WHERE song_id='$songEsc' AND server='$srvEsc'");
+            $left = ($still && $n = $still->fetch_assoc()) ? (int)$n['n'] : 0;
+            if ($left === 0) cover_song_unset($db, $refServer, $refSongId);
+        }
+        if (!empty($si['playlist_id'])) cover_pl_refresh($db, $cfg, (int)$si['playlist_id'], false);
     }
     echo json_encode(['ok' => $ok, 'msg' => $ok ? '已删除' : '删除失败']);
     exit;

@@ -35,11 +35,9 @@ foreach ($domainMap as $file => $actions) {
     foreach ($actions as $a) $actionToFile[$a] = $file;
 }
 
-// 提取每个action的代码块：
-// 从当前action的起始行到下一个action起始行之间的所有代码
+// 提取每个action的代码块:
 $sortedActions = array_keys($actionStarts);
-// 构建区间：每个action的结束行是下一个action的起始行-1
-// 同时排除 action 指令行（if 行自身用空行替代）和 exit 语句保持不变
+// 构建区间: 每个action的结束行是下一个action的起始行-1
 $extracted = [];
 $skipFromAction = []; // actions to skip already extracted
 
@@ -65,9 +63,7 @@ foreach ($actionLines as $lineNum => $action) {
 
 // 最后一个action：到渲染部分前（跳过 include pages/login 和末尾的渲染）
 $lastActionEnd = count($lines);
-// 找末尾的渲染部分起始（包含 logout 的代码在 login page 之前）
-// 使用动态检测：最后一个action的结束取到倒数第N行
-// 保守一点，取到 exclude 区域之前
+// 找末尾的渲染部分起始 (包含 logout 的代码在 login page 之前)
 $excludeStart = null;
 foreach ($lines as $i => $line) {
     if (preg_match("/^\s*\\\$tpl\s*=\s*/", $line) || preg_match("/^\s*if\s*\(\s*\\\$action\s*===?\s*''\s*/", $line)) {

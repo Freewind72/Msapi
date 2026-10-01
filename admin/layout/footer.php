@@ -5,17 +5,15 @@
 <?php if ($isMobile): ?>
 <div class="bottom-nav" id="bottomNav">
   <div class="nav-pill" id="navPill"></div>
-  <a href="?action=dashboard" class="nav-item<?= $action === 'dashboard' ? ' active' : '' ?>"><?= svg('dash') ?><span>仪表盘</span></a>
-  <a href="?action=keys" class="nav-item<?= $action === 'keys' ? ' active' : '' ?>"><?= svg('key') ?><span>密钥</span></a>
-  <a href="?action=users" class="nav-item<?= $action === 'users' ? ' active' : '' ?>"><?= svg('user') ?><span>人员</span></a>
-  <a href="?action=config" class="nav-item<?= $action === 'config' ? ' active' : '' ?>"><?= svg('config') ?><span>配置</span></a>
-  <a href="?action=settings" class="nav-item<?= $action === 'settings' ? ' active' : '' ?>"><?= svg('srv') ?><span>设置</span></a>
+<?php foreach ($navItems as $k => $item): ?>
+  <a href="?action=<?= $k ?>" class="nav-item<?= $k === $action ? ' active' : '' ?>"><?= $item['icon'] ?><span><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></span></a>
+<?php endforeach; ?>
 </div>
 <?php endif; ?>
 <?php $device = $isMobile ? 'mobile' : 'pc'; ?>
-<script src="<?= str_replace('{device}', $device, $RELAY['page']['base_js']) ?>"></script>
+<script src="<?= asset_ver(str_replace('{device}', $device, $RELAY['page']['base_js'])) ?>"></script>
 <?php $pageJsKey = $action . '_js'; if (isset($RELAY['page'][$pageJsKey])): ?>
-<script id="page-js" src="<?= str_replace('{device}', $device, $RELAY['page'][$pageJsKey]) ?>"></script>
+<script id="page-js" src="<?= asset_ver(str_replace('{device}', $device, $RELAY['page'][$pageJsKey])) ?>"></script>
 <?php endif; ?>
 </body>
 </html>

@@ -12,7 +12,11 @@ try {
     $db->exec('PRAGMA foreign_keys=ON');
     stream_line('[建立] 数据库文件 assets/sql/msapi.db');
 
-    $ourTables = array_keys(get_table_definitions('sqlite'));
+    // 结构以 install/lib/migrations.php 为唯一来源：与"每次访问的增量"同一套逻辑
+    require_once __DIR__ . '/../lib/migrations.php';
+    require_once __DIR__ . '/../lib/up_sqlite.php';
+
+    $ourTables = array_keys(get_migrations());
     $existing  = $db->query("SELECT name FROM sqlite_master WHERE type='table'");
     $cleaned   = 0;
     while ($row = $existing->fetchArray(SQLITE3_ASSOC)) {
@@ -27,11 +31,8 @@ try {
         stream_line('[清理] 无冗余');
     }
 
-    $tables = get_table_definitions('sqlite');
-    foreach ($tables as $name => $sql) {
-        $db->exec($sql);
-        stream_line("[建表] {$name}");
-    }
+    schema_sync_sqlite($db);
+    stream_line('[数据库] 表结构已同步（缺失的表 / 列 / 索引自动补齐）');
 
     $username = $input['username'] ?? 'admin';
     $password = password_hash($input['password'], PASSWORD_BCRYPT);

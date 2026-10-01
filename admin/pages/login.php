@@ -289,12 +289,20 @@ EOT;
 }
 
 $err = ''; $ok = '';
+// 读取极验配置
 $geetestCaptchaId = ''; $geetestKey = '';
+$r = $db->query("SELECT captcha_id, `key` FROM mapi_geetest LIMIT 1");
+if ($r && $grow = $r->fetch_assoc()) {
+    $geetestCaptchaId = $grow['captcha_id'] ?? '';
+    $geetestKey = $grow['key'] ?? '';
+}
+// 极验逃生开关：配置文件 security.geetest_bypass
+$geetestOn = ($geetestCaptchaId !== '' && $geetestKey !== '' && empty($cfg['security']['geetest_bypass']));
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$action) $action = 'login';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
     login_rl();
-    // 极验验证
-    if ($geetestCaptchaId && $geetestKey) {
+    // 极验验证（配置已在文件上方读取，这里才真正生效）
+    if ($geetestOn) {
         $gt_lot = $_POST['geetest_lot_number'] ?? '';
         $gt_output = $_POST['geetest_captcha_output'] ?? '';
         $gt_pass = $_POST['geetest_pass_token'] ?? '';
@@ -314,36 +322,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
             ]));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
             $gt_res = curl_exec($ch);
-            $gt_data = json_decode($gt_res, true);
-            if (!$gt_data || ($gt_data['result'] ?? '') !== 'success') {
+            $gt_http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $gt_curlErr = curl_error($ch);
+            curl_close($ch);
+            $gt_data = is_string($gt_res) ? json_decode($gt_res, true) : null;
+            if (!is_array($gt_data)) {
+// 极验服务异常时放行并记日志
+                error_log('MAPI geetest: validate 响应异常 http=' . $gt_http . ' curl=' . $gt_curlErr);
+            } elseif (($gt_data['result'] ?? '') !== 'success') {
                 $err = '安全验证失败，请重新验证';
             }
         }
     }
     if (!$err) {
         $u = trim($_POST['username'] ?? ''); $p = $_POST['password'] ?? '';
-    if (mb_strlen($u) > 30) { $u = ''; }
-    if ($u && $p) {
-        $stmt = $db->prepare("SELECT id,username,password,qq,email,is_admin,auto_theme,theme_mode,lyrics_default,autoplay_default,background,background_url FROM mapi_users WHERE username=?");
-        if (!$stmt) { $err = '数据库连接失败，请检查配置'; } else {
-        $stmt->bind_param('s', $u); $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        if ($row && password_verify($p, $row['password'])) {
-            session_regenerate_id(true);
-            $_SESSION['admin_id'] = $row['id']; $_SESSION['admin_user'] = $row['username'];
-            $_SESSION['admin_qq'] = $row['qq'] ?? ''; $_SESSION['admin_is_admin'] = (int)($row['is_admin'] ?? 2);
-            $_SESSION['admin_auto_theme'] = (int)($row['auto_theme'] ?? 1);
-            $_SESSION['admin_theme_mode'] = $row['theme_mode'] ?? 'light';
-            $_SESSION['admin_lyrics_default'] = (int)($row['lyrics_default'] ?? 1);
-            $_SESSION['admin_autoplay_default'] = (int)($row['autoplay_default'] ?? 0);
-            $_SESSION['admin_background'] = $row['background'] ?? '';
-            $_SESSION['admin_background_url'] = $row['background_url'] ?? '';
-            header('Location: ?action=dashboard'); exit;
+        if (mb_strlen($u) > 30) { $u = ''; }
+        if (!$u || !$p) {
+            $err = '请填写完整';
+        } else {
+            // 老库兼容：按 mapi_users 真实存在的列拼 SELECT，缺列不再抛异常导致 500 白屏
+            $row = null; $stmt = null;
+            try {
+                $stmt = $db->prepare('SELECT ' . mapi_users_select_cols($db) . ' FROM mapi_users WHERE username=?');
+                if ($stmt) {
+                    $stmt->bind_param('s', $u); $stmt->execute();
+                    $row = $stmt->get_result()->fetch_assoc();
+                }
+            } catch (Throwable $e) {
+                error_log('MAPI login: 查询 mapi_users 失败: ' . $e->getMessage());
+                $err = '登录失败：数据库结构异常，请检查 mapi_users 表';
+            }
+            if (!$err && !$stmt) { $err = '数据库连接失败，请检查配置'; }
+            if (!$err && $row && password_verify($p, $row['password'])) {
+                session_regenerate_id(true);
+                $_SESSION['admin_id'] = $row['id']; $_SESSION['admin_user'] = $row['username'];
+                $_SESSION['admin_qq'] = $row['qq'] ?? ''; $_SESSION['admin_is_admin'] = (int)($row['is_admin'] ?? 2);
+                $_SESSION['admin_auto_theme'] = (int)($row['auto_theme'] ?? 1);
+                $_SESSION['admin_theme_mode'] = $row['theme_mode'] ?? 'light';
+                // 设置后台界面主题
+                $_SESSION['admin_ui_theme'] = $row['admin_theme'] ?? 'light';
+                $_SESSION['admin_lyrics_default'] = (int)($row['lyrics_default'] ?? 1);
+                $_SESSION['admin_autoplay_default'] = (int)($row['autoplay_default'] ?? 0);
+                $_SESSION['admin_player_pos'] = trim((string)($row['player_pos'] ?? ''));
+                $_SESSION['admin_background'] = $row['background'] ?? '';
+                $_SESSION['admin_background_url'] = $row['background_url'] ?? '';
+                header('Location: ?action=dashboard'); exit;
+            }
+            if (!$err) { $err = '账号或密码错误'; }
         }
-        $err = '账号或密码错误';
-    }
-    } else { $err = '请填写完整'; }
     }
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'register') {
     $u = trim($_POST['username'] ?? ''); $p = $_POST['password'] ?? ''; $e = trim($_POST['email'] ?? ''); $q = trim($_POST['qq'] ?? ''); $vc = trim($_POST['vcode'] ?? '');
@@ -428,17 +456,25 @@ if ($action === 'pk-login-complete') {
     if ($nc === false) { header('Content-Type: application/json'); echo json_encode(['ok'=>false,'err'=>'验证失败']); exit; }
     $st2 = $db->prepare("UPDATE mapi_passkeys SET counter=? WHERE id=?");
     $st2->bind_param('ii', $nc, $pk['id']); $st2->execute();
-    $st3 = $db->prepare("SELECT id,username,qq,email,is_admin,auto_theme,theme_mode,lyrics_default,autoplay_default,background,background_url FROM mapi_users WHERE id=?");
-    $st3->bind_param('i', $pk['user_id']); $st3->execute();
-    $row = $st3->get_result()->fetch_assoc();
+    // 老库兼容：与密码登录同样按真实存在的列拼 SELECT
+    $row = null;
+    try {
+        $st3 = $db->prepare('SELECT ' . mapi_users_select_cols($db) . ' FROM mapi_users WHERE id=?');
+        if ($st3) { $st3->bind_param('i', $pk['user_id']); $st3->execute(); $row = $st3->get_result()->fetch_assoc(); }
+    } catch (Throwable $e) {
+        error_log('MAPI pk-login: 查询 mapi_users 失败: ' . $e->getMessage());
+    }
     if (!$row) { header('Content-Type: application/json'); echo json_encode(['ok'=>false,'err'=>'用户不存在']); exit; }
     session_regenerate_id(true);
     $_SESSION['admin_id'] = $row['id']; $_SESSION['admin_user'] = $row['username'];
     $_SESSION['admin_qq'] = $row['qq'] ?? ''; $_SESSION['admin_is_admin'] = (int)($row['is_admin'] ?? 2);
     $_SESSION['admin_auto_theme'] = (int)($row['auto_theme'] ?? 1);
     $_SESSION['admin_theme_mode'] = $row['theme_mode'] ?? 'light';
+    // 后台界面主题：独立列 admin_theme（缺列时回落 light，不影响播放器设置）
+    $_SESSION['admin_ui_theme'] = $row['admin_theme'] ?? 'light';
     $_SESSION['admin_lyrics_default'] = (int)($row['lyrics_default'] ?? 1);
     $_SESSION['admin_autoplay_default'] = (int)($row['autoplay_default'] ?? 0);
+                $_SESSION['admin_player_pos'] = trim((string)($row['player_pos'] ?? ''));
     $_SESSION['admin_background'] = $row['background'] ?? '';
     $_SESSION['admin_background_url'] = $row['background_url'] ?? '';
     unset($_SESSION['pk_challenge'], $_SESSION['pk_rp_id'], $_SESSION['pk_origin']);
@@ -456,11 +492,7 @@ $r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='login_th
 if ($r && $row = $r->fetch_assoc()) $loginTheme = $row['config_value'];
 $r = $db->query("SELECT config_value FROM mapi_config WHERE config_key='login_bg'");
 if ($r && $row = $r->fetch_assoc()) $loginBg = $row['config_value'];
-$r = $db->query("SELECT captcha_id, `key` FROM mapi_geetest LIMIT 1");
-if ($r && $row = $r->fetch_assoc()) {
-    $geetestCaptchaId = $row['captcha_id'] ?? '';
-    $geetestKey = $row['key'] ?? '';
-}
+// 极验配置已在文件上方（登录校验之前）读取，这里不再重复查询
 ?><!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,viewport-fit=cover">

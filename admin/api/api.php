@@ -1,18 +1,17 @@
 <?php
 declare(strict_types=1);
 
-/**
- * api.php — 音乐 API 主入口
- * 根据 server 参数分发到对应音源 API
- * tencent → qq_api.php（302 重定向，无 CORS 问题）
- * netease → wy_api.php（服务端代理音频流，绕过 CORS）
- */
+// api.php — 音乐 API 主入口
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Max-Age: 86400');
 header('Timing-Allow-Origin: *');
+// 动态接口不做任何缓存：配置/歌单/歌词随时可能变，避免浏览器启发式缓存导致"看到旧数据"
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+set_time_limit(30);
 
 $_current_api_key = '';
 
@@ -23,11 +22,13 @@ $jwt_secret = $CFG['api']['jwt_secret'] ?? hash('sha256', ($CFG['db']['password'
 require __DIR__ . '/../../assets/lib/db.php';
 require __DIR__ . '/../../assets/lib/api_config.php';
 require __DIR__ . '/../../assets/lib/helpers.php';
+require __DIR__ . '/../lib/cover_cache.php';      // 封面统一存数据库
 
 rate_limit_check('api', 120, 60);
 
 $db_log = db_connect();
 $api    = read_mapi_api_config($db_log, $CFG);
+if ($db_log) cover_store_ensure($db_log);          // 幂等：首次运行建表/建列
 
 $ua     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
@@ -82,8 +83,9 @@ switch ($action) {
         if (!$songs || !is_array($songs)) { json_exit([]); }
         $songs = array_slice($songs, 0, $limit);
         $result = [];
+        $resolveUrls = [];
         $lrcUrls = [];
-        foreach ($songs as $s) {
+        foreach ($songs as $idx => $s) {
             $mid = '';
             if (!empty($s[$fLrc]) && preg_match('/[?&]' . preg_quote($pId, '/') . '=([^&]+)/', $s[$fLrc], $m)) {
                 $mid = $m[1];
@@ -111,16 +113,14 @@ switch ($action) {
                 }
             }
             $playUrl = '';
-            if ($server === 'netease') {
-                if ($mid) {
-                    $playUrl = resolve_play_url($mid, $apiBase, $ua, $qqRef, $server, $rServer, $rType, $rId);
-                }
-            } else {
-                if (!empty($s[$fUrl])) {
-                    $playUrl = preg_replace('/^http:/i', 'https:', $s[$fUrl]);
-                }
+            if ($server === 'netease' && $mid) {
+                $resolveUrls[$idx] = Uri\Rfc3986\Uri::parse($apiBase)
+                    ->withQuery(http_build_query([$rServer => $server, $rType => 'url', $rId => $mid]))
+                    ->toString();
+            } elseif ($server === 'tencent' && !empty($s[$fUrl])) {
+                $playUrl = preg_replace('/^http:/i', 'https:', $s[$fUrl]);
             }
-            $result[] = [
+            $result[$idx] = [
                 'id'     => $mid,
                 'name'   => $s[$fTitle] ?? '未知',
                 'artist' => $s[$fArtist] ?? '',
@@ -129,57 +129,87 @@ switch ($action) {
                 'lrc'    => '',
             ];
             if ($mid && !empty($s[$fLrc])) {
-                $lrcUrls[$mid] = $s[$fLrc];
+                $lrcUrls[$idx] = preg_replace('/^http:/i', 'https:', $s[$fLrc]);
             }
         }
-        if (!empty($lrcUrls)) {
+        if (!empty($resolveUrls) || !empty($lrcUrls)) {
             $mh = curl_multi_init();
             $channels = [];
-            foreach ($lrcUrls as $mid => $lrcUrl) {
-                $lrcUrl = preg_replace('/^http:/i', 'https:', $lrcUrl);
+            foreach ($resolveUrls as $idx => $ru) {
                 $ch = curl_init();
                 curl_setopt_array($ch, [
-                    CURLOPT_URL => $lrcUrl,
+                    CURLOPT_URL            => $ru,
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 10,
-                    CURLOPT_CONNECTTIMEOUT => 5,
+                    CURLOPT_TIMEOUT        => 6,
+                    CURLOPT_CONNECTTIMEOUT => 3,
                     CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_USERAGENT => $ua,
-                    CURLOPT_REFERER => $qqRef,
-                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_USERAGENT      => $ua,
+                    CURLOPT_REFERER        => $qqRef,
+                    CURLOPT_FOLLOWLOCATION => false,
+                    CURLOPT_HEADER         => true,
+                    CURLOPT_TCP_NODELAY    => true,
                 ]);
                 curl_multi_add_handle($mh, $ch);
-                $channels[$mid] = $ch;
+                $channels['r_' . $idx] = ['ch' => $ch, 'idx' => $idx, 'type' => 'resolve'];
+            }
+            foreach ($lrcUrls as $idx => $lu) {
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL            => $lu,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 6,
+                    CURLOPT_CONNECTTIMEOUT => 3,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_USERAGENT      => $ua,
+                    CURLOPT_REFERER        => $qqRef,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_TCP_NODELAY    => true,
+                ]);
+                curl_multi_add_handle($mh, $ch);
+                $channels['l_' . $idx] = ['ch' => $ch, 'idx' => $idx, 'type' => 'lrc'];
             }
             $running = null;
             do {
                 curl_multi_exec($mh, $running);
                 curl_multi_select($mh, 0.3);
             } while ($running > 0);
-            foreach ($channels as $mid => $ch) {
+            foreach ($channels as $key => $info) {
+                $ch = $info['ch'];
+                $idx = $info['idx'];
                 $raw = curl_multi_getcontent($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                if ($httpCode === 200 && $raw) {
-                    // netease 歌词返回 JSON，需解包提取纯 LRC 文本
-                    if ($server === 'netease') {
-                        $decoded = json_decode($raw, true);
-                        if (is_array($decoded)) {
-                            $raw = $decoded['lyric']
-                                ?? $decoded['lrc']['lyric']
-                                ?? $decoded['lrc']
-                                ?? $raw;
+                if ($info['type'] === 'resolve') {
+                    if ($httpCode === 302 && is_string($raw)) {
+                        preg_match('/^Location:\s+(.+)/im', $raw, $m);
+                        $result[$idx]['url'] = trim($m[1] ?? '');
+                    } elseif ($httpCode === 200 && is_string($raw)) {
+                        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+                        $body = substr($raw, $headerSize);
+                        $json = json_decode($body, true);
+                        if (is_array($json) && !empty($json['url'])) {
+                            $result[$idx]['url'] = $json['url'];
                         }
                     }
-                    foreach ($result as &$r) {
-                        if ($r['id'] == $mid) { $r['lrc'] = $raw; break; }
+                } else {
+                    if ($httpCode === 200 && $raw) {
+                        $lrcRaw = $raw;
+                        if ($server === 'netease') {
+                            $decoded = json_decode($raw, true);
+                            if (is_array($decoded)) {
+                                $lrcRaw = $decoded['lyric']
+                                    ?? $decoded['lrc']['lyric']
+                                    ?? $decoded['lrc']
+                                    ?? $raw;
+                            }
+                        }
+                        $result[$idx]['lrc'] = $lrcRaw;
                     }
-                    unset($r);
                 }
                 curl_multi_remove_handle($mh, $ch);
             }
             curl_multi_close($mh);
         }
-        json_exit($result);
+        json_exit(array_values($result));
         break;
 
     case 'url':
@@ -290,6 +320,12 @@ switch ($action) {
         $auth = $_GET['auth'] ?? '';
         $server = $_GET['server'] ?? 'tencent';
         $server = in_array($server, ['tencent', 'netease'], true) ? $server : 'tencent';
+        // 封面已存数据库：命中缓存直接出图，不再回源（后台增删歌曲/换封面时写入）
+        $cachedCover = cover_song_get($db_log, $server, (string)$id);
+        if ($cachedCover !== '' && cover_data_output($cachedCover)) {
+            logRequest('pic:' . $id, 0);
+            exit;
+        }
         $params = [$rServer => $server, $rType => 'pic', $rId => $id];
         if ($auth) $params[$pAuth] = $auth;
         $src = Uri\Rfc3986\Uri::parse($apiBase)->withQuery(http_build_query($params))->toString();
@@ -338,10 +374,16 @@ switch ($action) {
         }
         $_current_api_key = $k;
         if (!$k) json_exit(['ok' => false, 'config' => null, 'msg' => 'missing key']);
+        $sourceCfg = [
+            'base_url' => $apiBase,
+            'params'   => ['server' => $rServer, 'type' => $rType, 'id' => $rId],
+            'fields'   => ['title' => $fTitle, 'artist' => $fArtist, 'url' => $fUrl, 'pic' => $fPic, 'lrc' => $fLrc, 'id' => $pId, 'auth' => $pAuth],
+        ];
         if (!$db_log) {
             json_exit(['ok' => true, 'config' => [
                 'auto_theme' => 1, 'theme_mode' => 'light', 'lyrics_default' => 1,
-                'autoplay_default' => 0, 'playlists' => []
+                'autoplay_default' => 0, 'player_pos' => 'right:88', 'playlists' => [],
+                'source' => $sourceCfg,
             ]]);
         }
         $keyStmt = $db_log->prepare("SELECT user_id, id FROM mapi_keys WHERE api_key=? AND status=1");
@@ -363,6 +405,19 @@ switch ($action) {
         $themeMode = $userRow ? $userRow['theme_mode'] : 'light';
         $lyricsDefault = $userRow ? (int)($userRow['lyrics_default'] ?? 1) : 1;
         $autoplayDefault = $userRow ? (int)($userRow['autoplay_default'] ?? 0) : 0;
+        // 播放器首次加载位置（side:pct）；老库没这列时用内置默认
+        $playerPos = 'right:88';
+        try {
+            $posStmt = $db_log->prepare("SELECT player_pos FROM mapi_users WHERE id=?");
+            if ($posStmt) {
+                $posStmt->bind_param('i', $userId);
+                $posStmt->execute();
+                $posRes = $posStmt->get_result();
+                $posRow = $posRes ? $posRes->fetch_assoc() : null;
+                $cand = trim((string)($posRow['player_pos'] ?? ''));
+                if (preg_match('/^(left|right):\d{1,3}$/', $cand)) $playerPos = $cand;
+            }
+        } catch (Throwable $e) { /* 列不存在：用默认 */ }
         $keyId = (int)$keyRow['id'];
         $playlists = [];
         if ($db_log) {
@@ -372,32 +427,40 @@ switch ($action) {
             $plRes = $plStmt->get_result();
             while ($pr = $plRes->fetch_assoc()) {
                 $plItem = [
+                    'pid'  => (int)$pr['id'],   // 稳定歌单标识：播放器用它记忆"上次听的歌单"，后台重排/改名都不受影响
                     'name' => $pr['name'],
                     'server' => $pr['server'],
                     'cover_url' => $pr['cover_url'],
                     'cover_mode' => $pr['cover_mode'],
                 ];
+                // 歌曲一律从库里取（missing=0 过滤掉上游已下架的）
+                $plId = (int)$pr['id'];
+                $songStmt = $db_log->prepare("SELECT song_id, name, artist, server FROM mapi_songs WHERE playlist_id=? AND missing=0 ORDER BY sort_order ASC, id ASC");
+                $songStmt->bind_param('i', $plId);
+                $songStmt->execute();
+                $songRes = $songStmt->get_result();
+                $plSongs = [];
+                while ($sr = $songRes->fetch_assoc()) {
+                    $plSongs[] = ['id' => $sr['song_id'], 'name' => $sr['name'], 'artist' => $sr['artist'], 'server' => $sr['server']];
+                }
                 if ($pr['type'] === 'remote' && $pr['remote_id']) {
-                    $plItem['id'] = $pr['remote_id'];
-                    $plItem['type'] = 'playlist';
-                    $playlists[] = $plItem;
-                } else {
-                    $plId = (int)$pr['id'];
-                    $songStmt = $db_log->prepare("SELECT song_id, name, artist, server FROM mapi_songs WHERE playlist_id=? ORDER BY sort_order ASC, id ASC");
-                    $songStmt->bind_param('i', $plId);
-                    $songStmt->execute();
-                    $songRes = $songStmt->get_result();
-                    $plSongs = [];
-                    while ($sr = $songRes->fetch_assoc()) {
-                        $plSongs[] = ['id' => $sr['song_id'], 'name' => $sr['name'], 'artist' => $sr['artist'], 'server' => $sr['server']];
+                    if ($plSongs) {
+                        // 有本地快照：走快照（歌曲有稳定 song_id，身份/排序/封面都稳，上游挂了也能放）
+                        $plItem['type'] = 'custom';
+                        $plItem['songs'] = $plSongs;
+                    } else {
+                        // 还没快照（创建时上游没取到）：保持原样，交给前端实时拉
+                        $plItem['id'] = $pr['remote_id'];
+                        $plItem['type'] = 'playlist';
                     }
+                } else {
                     $plItem['type'] = 'custom';
                     $plItem['songs'] = $plSongs;
-                    $playlists[] = $plItem;
                 }
+                $playlists[] = $plItem;
             }
         }
-        json_exit(['ok' => true, 'config' => ['auto_theme' => $autoTheme, 'theme_mode' => $themeMode, 'lyrics_default' => $lyricsDefault, 'autoplay_default' => $autoplayDefault, 'playlists' => $playlists]]);
+        json_exit(['ok' => true, 'config' => ['auto_theme' => $autoTheme, 'theme_mode' => $themeMode, 'lyrics_default' => $lyricsDefault, 'autoplay_default' => $autoplayDefault, 'player_pos' => $playerPos, 'playlists' => $playlists, 'source' => $sourceCfg]]);
 
     case 'get-announcement':
         $k = $_GET['key'] ?? '';

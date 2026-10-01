@@ -8,7 +8,7 @@ function initDebugExpand() {
 
 initDebugExpand();
 
-document.addEventListener('change', function (e) {
+if (!window.__dashDebugChangeBound) { window.__dashDebugChangeBound = 1; document.addEventListener('change', function (e) {
   var dt = e.target;
   if (dt.id !== 'debugToggle') return;
   var on = dt.checked ? 1 : 0;
@@ -37,4 +37,4 @@ document.addEventListener('change', function (e) {
       }
     })
     .catch(function () { showToast('请求失败', 'err'); });
-});
+}); }

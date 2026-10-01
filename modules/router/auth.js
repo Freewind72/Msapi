@@ -16,6 +16,8 @@
         var x = new XMLHttpRequest();
         x.open('POST', _.API_BASE + '?action=verify-key', true);
         x.setRequestHeader('Content-Type', 'application/json');
+        x.timeout = 15000;                       // 请求卡住时也要让启动有个结果（宿主页按钮才能恢复为“加载”）
+        x.ontimeout = function() { cb(false); };
         x.onload = function() {
             try {
                 var d = JSON.parse(x.responseText);

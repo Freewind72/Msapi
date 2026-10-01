@@ -70,6 +70,20 @@
 // ═══ Cookie 持久化 ═══
     function setCookie(n,v){try{document.cookie=n+'='+encodeURIComponent(v)+';path=/;max-age=31536000;SameSite=Lax'+(location.protocol==='https:'?';Secure':'')}catch(e){}}
     function getCookie(n){try{var m=document.cookie.match('(^| )'+n+'=([^;]+)');return m?decodeURIComponent(m[2]):''}catch(e){return ''}}
+    // 播放器实例标识：同页多个播放器各自独立记忆
+    var _INSTANCE_ID = (function(){
+        var t = document.currentScript;
+        if (!t) return '';
+        var id = t.getAttribute('data-player-id') || t.getAttribute('player-id') || t.id || '';
+        if (id) return String(id).replace(/[^A-Za-z0-9_-]/g, '');
+        var list = document.querySelectorAll('script[src*="route=chiropractic"],script[src*="chiropractic/embed.js"]');
+        if (list.length <= 1) return '';
+        for (var i = 0; i < list.length; i++) { if (list[i] === t) return 'p' + (i + 1); }
+        return '';
+    })();
+    function _ck(base){ return _INSTANCE_ID ? base + '_' + _INSTANCE_ID : base; }
+    function _ckGet(base){ var v = getCookie(_ck(base)); if (v === '' && _INSTANCE_ID) v = getCookie(base); return v; }
+
     function delCookie(n){try{document.cookie=n+'=;path=/;max-age=0'}catch(e){}}
 
 // ═══ Cookie 授权弹窗 ═══
@@ -131,7 +145,6 @@
     }
 
 // ═══ 创建 Shadow DOM ═══
-// ═══ 加载 CSS ═══
     var _MP_CSS = '';
 // ═══ CSS 内联（无需跨域加载）═══
     var _MP_CSS = `*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;font-family:-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif}
@@ -470,7 +483,7 @@
 
 // ═══ 播放器逻辑 ═══
     var MP = {
-        ap: null, songs: [], playlists: [], currentPlaylistIndex: 0, mode: 'list', open: false, lrcLines: [], _side: 'right', _showLrc: true, _lrcAnimating: false, _retracted: false, _retractTimer: null, _imOpen: false, _autoTheme: true, _themeMode: 'light', _autoplayDefault: false, _autoplayTried: false, _server: 'netease', _loading: false,
+        ap: null, songs: [], playlists: [], currentPlaylistIndex: 0, mode: 'list', open: false, lrcLines: [], _side: 'right', _showLrc: true, _lrcAnimating: false, _retracted: false, _retractTimer: null, _imOpen: false, _autoTheme: true, _themeMode: 'light', _autoplayDefault: false, _autoplayTried: false, _server: 'netease', _loading: false, _source: null,
 
         showToggle: function() {
             var el = this.$('toggle');
@@ -541,6 +554,9 @@
                 if (window.__mszeph_config.server !== undefined) {
                     self._server = window.__mszeph_config.server;
                 }
+                if (window.__mszeph_config.source) {
+                    self._source = window.__mszeph_config.source;
+                }
                 self.checkTheme();
                 var pls = (window.__mszeph_config.playlists || []).map(function(p){ p.type = p.type || 'playlist'; return p; });
                 if (pls && pls.length) { self.playlists = pls; self.fetchAllPlaylists(); }
@@ -567,6 +583,9 @@
                             }
                             if (data.config.server !== undefined) {
                                 self._server = data.config.server;
+                            }
+                            if (data.config.source) {
+                                self._source = data.config.source;
                             }
                             self.checkTheme();
                             var pls = (data.config.playlists || []).map(function(p){ p.type = p.type || 'playlist'; return p; });
@@ -832,6 +851,187 @@
             setCookie('mapi_greeting', period);
         },
 
+        _sourceURL: function(type, id, server) {
+            if (!this._source) return null;
+            var base = this._source.base_url;
+            var p = this._source.params;
+            var params = {};
+            params[p.server] = server || this._server || 'netease';
+            params[p.type] = type;
+            params[p.id] = id || '';
+            return base + (base.indexOf('?') >= 0 ? '&' : '?') + Object.keys(params).map(function(k){ return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+        },
+
+        _parseSourceRaw: function(raw, server) {
+            if (!raw || !Array.isArray(raw)) return [];
+            var f = (this._source && this._source.fields) || {};
+            var out = [];
+            for (var i = 0; i < raw.length; i++) {
+                var s = raw[i] || {};
+                var mid = '';
+                var fUrl = f.url || 'url';
+                var fLrc = f.lrc || 'lrc';
+                var pId = f.id || 'id';
+                var picAuth = '';
+                var picId = '';
+                var lrcUrl = '';
+                var rawUrl = s[fUrl] || '';
+                var rawLrc = s[fLrc] || '';
+                var rawPic = s[f.pic || 'pic'] || '';
+                if (rawLrc) {
+                    if (this._isInlineLrc(rawLrc)) {
+                        lrcUrl = rawLrc;        // 接口已内联歌词正文：直接使用
+                    } else {
+                        var m1 = rawLrc.match(new RegExp('[?&]' + pId + '=([^&]+)'));
+                        if (m1) { mid = m1[1]; lrcUrl = rawLrc; }
+                    }
+                }
+                if (!mid && rawUrl) {
+                    var m2 = rawUrl.match(new RegExp('[?&]' + pId + '=([^&]+)'));
+                    if (m2) { mid = m2[1]; }
+                }
+                if (rawPic) {
+                    var m3 = rawPic.match(new RegExp('[?&]' + pId + '=([^&]+)'));
+                    if (m3) picId = m3[1];
+                    if (f.auth) {
+                        var m4 = rawPic.match(new RegExp('[?&]' + f.auth + '=([^&]+)'));
+                        if (m4) picAuth = m4[1];
+                    }
+                }
+                out.push({
+                    mid: mid,
+                    title: s[f.title || 'title'] || '',
+                    artist: s[f.artist || 'artist'] || '',
+                    rawUrl: rawUrl,
+                    rawPic: rawPic,
+                    picId: picId,
+                    picAuth: picAuth,
+                    lrcUrl: lrcUrl,
+                    server: server,
+                });
+            }
+            return out;
+        },
+
+        _fetchWithTimeout: function(url, ms, asText) {
+            return new Promise(function(resolve, reject) {
+                var ctrl = null;
+                var timer = null;
+                var aborted = false;
+                if (typeof AbortController !== 'undefined') ctrl = new AbortController();
+                var childSig = ctrl ? ctrl.signal : undefined;
+                timer = setTimeout(function() {
+                    aborted = true;
+                    if (ctrl) try { ctrl.abort(); } catch(e) {}
+                    try { var e = new Error('timeout'); e.name = 'TimeoutError'; reject(e); } catch(err) {}
+                }, ms || 10000);
+                fetch(url, {signal: childSig, credentials: 'omit'}).then(function(r) {
+                    if (aborted) return;
+                    clearTimeout(timer);
+                    if (!r.ok) throw new Error('http ' + r.status);
+                    return asText ? r.text() : r.json();
+                }).then(function(d) {
+                    if (aborted) return;
+                    resolve(d);
+                }).catch(function(err) {
+                    if (aborted) return;
+                    clearTimeout(timer);
+                    reject(err);
+                });
+            });
+        },
+
+        // 地址统一升级为 https (crossOrigin='anonymous' 的 <audio> 是 CORS 请求,
+        _httpsUrl: function(u) {
+            if (!u || typeof u !== 'string') return '';
+            if (/^http:\/\//i.test(u)) return u.replace(/^http:/i, 'https:');
+            if (/^\/\//.test(u)) return 'https:' + u;
+            return u;
+        },
+
+        _sourceResolveUrls: function(parsedList, server) {
+            var self = this;
+            if (server !== 'netease') {
+                var arr = [];
+                for (var i = 0; i < parsedList.length; i++) {
+                    var rawUrl = parsedList[i].rawUrl || '';
+                    arr.push({idx: i, url: self._httpsUrl(rawUrl)});
+                }
+                return Promise.resolve(arr);
+            }
+            var mh = parsedList.filter(function(p){ return p.mid; });
+            var tasks = mh.map(function(p) {
+                return self._fetchWithTimeout(self._sourceURL('url', p.mid, server), 8000).then(function(data) {
+                    var out = {idx: -1, url: ''};
+                    for (var i = 0; i < parsedList.length; i++) {
+                        if (parsedList[i].mid === p.mid) { out.idx = i; break; }
+                    }
+                    if (Array.isArray(data) && data[0]) out.url = data[0].url || '';
+                    else if (data && typeof data === 'object') out.url = data.url || '';
+                    return out;
+                }).catch(function() { return {idx: -1, url: ''}; });
+            });
+            return Promise.all(tasks).then(function(results) {
+                var byIdx = {};
+                for (var i = 0; i < results.length; i++) {
+                    if (results[i].idx >= 0) byIdx[results[i].idx] = results[i].url;
+                }
+                var out = [];
+                for (var j = 0; j < parsedList.length; j++) {
+                    // 解析不到时回退接口原样给的 url（上游 type=url 是 302 跳转，不是 JSON）
+                    out.push({idx: j, url: self._httpsUrl(byIdx[j] || parsedList[j].rawUrl || '')});
+                }
+                return out;
+            });
+        },
+
+        // 歌词取值：上游 type=lrc 返回 text/plain 的 LRC 正文，本站接口也可能内联歌词
+        _isInlineLrc: function(v) {
+            if (!v || typeof v !== 'string') return false;
+            var s = v.trim();
+            if (/\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]/.test(s)) return true;
+            return s.charAt(0) === '{' && /"(?:lyric|lrc)"/.test(s);
+        },
+
+        _unwrapLrc: function(data) {
+            if (typeof data === 'string') {
+                var s = data.replace(/^\uFEFF/, '').trim();
+                if (s.charAt(0) === '{' || s.charAt(0) === '[') {
+                    try {
+                        var obj = JSON.parse(s);
+                        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+                            return obj.lyric || (obj.lrc && (obj.lrc.lyric || obj.lrc)) || '';
+                        }
+                    } catch (e) { /* 不是 JSON：按纯文本处理 */ }
+                }
+                return data;
+            }
+            if (data && typeof data === 'object' && !Array.isArray(data)) {
+                return data.lyric || (data.lrc && (data.lrc.lyric || data.lrc)) || '';
+            }
+            return '';
+        },
+
+        _sourceResolveLrcs: function(lrcTasks, server) {
+            var self = this;
+            var tasks = lrcTasks.map(function(t) {
+                if (!t.lrc) return Promise.resolve({idx: t.idx, lrc: ''});
+                if (self._isInlineLrc(t.lrc)) return Promise.resolve({idx: t.idx, lrc: t.lrc});
+                // 接口可能返回 http 链接：HTTPS 页面里 fetch(http) 会被当作混合内容拦截
+                var lrcUrl = /^http:\/\//i.test(t.lrc) ? t.lrc.replace(/^http:/i, 'https:') : t.lrc;
+                return self._fetchWithTimeout(lrcUrl, 8000, true).then(function(data) {
+                    return {idx: t.idx, lrc: self._unwrapLrc(data)};
+                }).catch(function() { return {idx: t.idx, lrc: ''}; });
+            });
+            return Promise.all(tasks).then(function(results) {
+                var byIdx = {};
+                for (var i = 0; i < results.length; i++) {
+                    if (results[i].idx >= 0 && results[i].lrc) byIdx[results[i].idx] = results[i].lrc;
+                }
+                return byIdx;
+            });
+        },
+
         fetchAllPlaylists: function() {
             var self = this;
             if (!self.playlists || self.playlists.length === 0) {
@@ -850,7 +1050,32 @@
                     if (plType === 'custom') {
                         if (pl.songs && pl.songs.length) {
                             var songPromises = pl.songs.map(function(s) {
-                                var songUrl = API_BASE + '?action=song&id=' + encodeURIComponent(s.id) + '&server=' + encodeURIComponent(s.server || 'netease') + '&token=' + encodeURIComponent(API_TOKEN);
+                                var server = s.server || 'netease';
+                                if (self._source) {
+                                    var directUrl = self._sourceURL('song', s.id, server);
+                                    return self._fetchWithTimeout(directUrl, 10000).then(function(raw) {
+                                        var parsed = self._parseSourceRaw(raw, server);
+                                        if (!parsed.length) return null;
+                                        var item = parsed[0];
+                                        return self._sourceResolveUrls([item], server).then(function(urlResults) {
+                                            return self._sourceResolveLrcs([{idx: 0, lrc: item.lrcUrl || ''}], server).then(function(lrcMap) {
+                                                var picUrl = '';
+                                                if (item.rawPic) {
+                                                    if (/^https?:\/\//.test(item.rawPic)) picUrl = item.rawPic;
+                                                    else if (item.picId) {
+                                                        var picParams = ['action=pic', 'server=' + encodeURIComponent(server), (self._source.params.id || 'id') + '=' + encodeURIComponent(item.picId)];
+                                                        if (item.picAuth) picParams.push((self._source.fields.auth || 'auth') + '=' + encodeURIComponent(item.picAuth));
+                                                        picUrl = API_BASE + '?' + picParams.join('&') + '&token=' + encodeURIComponent(API_TOKEN || '');
+                                                    }
+                                                }
+                                                var u = urlResults[0] && urlResults[0].url ? urlResults[0].url : '';
+                                                if (!u) return null;
+                                                return {name: item.title || '未知', artist: item.artist || '', url: u, pic: picUrl, lrc: lrcMap[0] || '', id: item.mid};
+                                            });
+                                        });
+                                    }).catch(function(){ return null; });
+                                }
+                                var songUrl = API_BASE + '?action=song&id=' + encodeURIComponent(s.id) + '&server=' + encodeURIComponent(server) + '&token=' + encodeURIComponent(API_TOKEN);
                                 return fetch(songUrl, {credentials:'same-origin'}).then(function(r){return r.json()}).then(function(data){
                                     if (Array.isArray(data) && data.length > 0) return data[0];
                                     return null;
@@ -879,19 +1104,70 @@
                     }
                     if (!pl.id) { self._allSongs[idx] = []; promises.push(Promise.resolve()); return; }
                     var action = plType === 'song' ? 'song' : 'playlist';
-                    var url = API_BASE + '?action=' + action + '&id=' + encodeURIComponent(pl.id) + '&limit=30&server=' + encodeURIComponent(pl.server || 'netease') + '&token=' + encodeURIComponent(API_TOKEN);
-                    promises.push(
-                        fetch(url, {credentials:'same-origin'}).then(function(r){return r.json()}).then(function(data){
-                            if (!Array.isArray(data) || data.length === 0) return;
-                            data.forEach(function(s){
-                                if (s.pic && !/^https?:\/\//.test(s.pic)) s.pic = API_BASE + s.pic + '&token=' + encodeURIComponent(API_TOKEN);
-                            });
-                            self._allSongs[idx] = data;
-                            if (data.length > 0 && data[0].pic) {
-                                self._playlistCovers[idx] = data[0].pic;
-                            }
-                        }).catch(function(){})
-                    );
+                    var server = pl.server || 'netease';
+                    if (self._source) {
+                        var directUrl = self._sourceURL(action, pl.id, server);
+                        var limit = Math.min(pl.limit || 30, 50);
+                        if (directUrl && limit !== 30) {
+                            var sep = directUrl.indexOf('?') >= 0 ? '&' : '?';
+                            directUrl = directUrl + sep + 'limit=' + limit;
+                        }
+                        promises.push(
+                            self._fetchWithTimeout(directUrl, 10000).then(function(raw) {
+                                var parsedList = self._parseSourceRaw(raw, server);
+                                var resolveTasks = [];
+                                for (var k = 0; k < parsedList.length; k++) {
+                                    resolveTasks.push({idx: k, lrc: parsedList[k].lrcUrl || ''});
+                                }
+                                return self._sourceResolveUrls(parsedList, server).then(function(urlResults) {
+                                    return self._sourceResolveLrcs(resolveTasks, server).then(function(lrcMap) {
+                                        var result = [];
+                                        for (var j = 0; j < parsedList.length; j++) {
+                                            var plItem = parsedList[j];
+                                            var u = urlResults[j] && urlResults[j].url ? urlResults[j].url : '';
+                                            var l = lrcMap[j] || '';
+                                            var picUrl = '';
+                                            if (plItem.rawPic) {
+                                                if (/^https?:\/\//.test(plItem.rawPic)) picUrl = plItem.rawPic;
+                                                else if (plItem.picId) {
+                                                    var picParams2 = ['action=pic', 'server=' + encodeURIComponent(server), (self._source.params.id || 'id') + '=' + encodeURIComponent(plItem.picId)];
+                                                    if (plItem.picAuth) picParams2.push((self._source.fields.auth || 'auth') + '=' + encodeURIComponent(plItem.picAuth));
+                                                    picUrl = API_BASE + '?' + picParams2.join('&') + '&token=' + encodeURIComponent(API_TOKEN || '');
+                                                }
+                                            }
+                                            result.push({
+                                                id: plItem.mid || plItem.title,
+                                                name: plItem.title || '未知',
+                                                artist: plItem.artist || '',
+                                                url: u,
+                                                pic: picUrl,
+                                                lrc: l,
+                                            });
+                                        }
+                                        result = result.slice(0, limit || 50);
+                                        if (result.length) {
+                                            self._allSongs[idx] = result;
+                                            if (result[0].pic) self._playlistCovers[idx] = result[0].pic;
+                                        }
+                                    });
+                                });
+                            }).catch(function(){})
+                        );
+                    } else {
+                        var url = API_BASE + '?action=' + action + '&id=' + encodeURIComponent(pl.id) + '&limit=30&server=' + encodeURIComponent(server) + '&token=' + encodeURIComponent(API_TOKEN);
+                        promises.push(
+                            fetch(url, {credentials:'same-origin'}).then(function(r){return r.json()}).then(function(data){
+                                if (!Array.isArray(data) || data.length === 0) return;
+                                data.forEach(function(s){
+                                    if (s.pic && !/^https?:\/\//.test(s.pic)) s.pic = API_BASE + s.pic + '&token=' + encodeURIComponent(API_TOKEN);
+                                });
+                                self._allSongs[idx] = data;
+                                if (data.length > 0 && data[0].pic) {
+                                    self._playlistCovers[idx] = data[0].pic;
+                                }
+                            }).catch(function(){})
+                        );
+                    }
                 })(i);
             }
             Promise.all(promises).then(function(){
@@ -956,7 +1232,7 @@
 
         _loadSavedPlaylistIndex: function() {
             try {
-                var idx = getCookie('mapi_pl_index');
+                var idx = _ckGet('mapi_pl_index');
                 if (idx !== null && idx !== '') {
                     var n = parseInt(idx);
                     if (!isNaN(n) && n >= 0 && n < this.playlists.length) return n;
@@ -1098,7 +1374,7 @@
                     var _menu = self.$('modeMenu');
                     if (_menu) { _menu.querySelectorAll('.mode-option').forEach(function(o){ o.classList.toggle('active', o.getAttribute('data-mode')===_savedMode); }); }
                 }
-                var _savedSong = getCookie('mapi_song');
+                var _savedSong = _ckGet('mapi_song');
                 if (_savedSong && self.ap && self.ap.list) {
                     var _n = parseInt(_savedSong);
                     if (!isNaN(_n) && _n >= 0 && _n < self.ap.list.audios.length) {
@@ -1126,9 +1402,9 @@
             self._ready = true;
             /* 直接写入 cookie，不经过 saveState，避免任何中间状态干扰 */
             if (self._cookieConsented && self.ap && self.ap.list) {
-                setCookie('mapi_song', _songToRestore >= 0 ? _songToRestore : self.ap.list.index);
-                setCookie('mapi_pl_index', self.currentPlaylistIndex);
-                setCookie('mapi_pos', self._side);
+                setCookie(_ck('mapi_song'), _songToRestore >= 0 ? _songToRestore : self.ap.list.index);
+                setCookie(_ck('mapi_pl_index'), self.currentPlaylistIndex);
+                setCookie(_ck('mapi_pos'), self._side);
                 setCookie('mapi_mode', self.mode || 'list');
                 if (self.ap.audio) setCookie('mapi_volume', self.ap.audio.volume);
             }
@@ -1370,16 +1646,16 @@
             if (!this._ready) return;
             if (!this._cookieConsented) return;
             if (!this.ap || !this.ap.list) return;
-            setCookie('mapi_song', this.ap.list.index);
-            setCookie('mapi_pl_index', this.currentPlaylistIndex < (this.playlists?this.playlists.length:0) ? this.currentPlaylistIndex : 0);
-            var _top=hostRoot.host.style.top;setCookie('mapi_pos', this._side+(_top&&_top!=='initial'&&_top!=='auto'?',t:'+_top:''));
+            setCookie(_ck('mapi_song'), this.ap.list.index);
+            setCookie(_ck('mapi_pl_index'), this.currentPlaylistIndex < (this.playlists?this.playlists.length:0) ? this.currentPlaylistIndex : 0);
+            var _top=hostRoot.host.style.top;setCookie(_ck('mapi_pos'), this._side+(_top&&_top!=='initial'&&_top!=='auto'?',t:'+_top:''));
             setCookie('mapi_mode', this.mode || 'list');
             if (this.ap && this.ap.audio) setCookie('mapi_volume', this.ap.audio.volume);
         },
         loadState: function() {
             if (!this._cookieConsented) return;
 
-            var idx = getCookie('mapi_song'), mode = getCookie('mapi_mode');
+            var idx = _ckGet('mapi_song'), mode = getCookie('mapi_mode');
             if (idx && this.ap && this.ap.list) {
                 var n = parseInt(idx);
                 if (!isNaN(n) && n >= 0 && n < this.ap.list.audios.length) {
@@ -1641,10 +1917,12 @@
                     if (_a && _a._lrc && _a._lrc.indexOf('此歌曲为没有填词的纯音乐') >= 0) {
                         if (wrap) wrap.style.display = '';
                         container.innerHTML = '<div class="im-lrc-line active">此歌曲为没有填词的纯音乐，请您欣赏</div>';
+                        container._lrcSig = '__placeholder__';
                         return;
                     }
                 } catch(e) {}
                 container.innerHTML = '';
+                container._lrcSig = '';
                 if (wrap) wrap.style.display = 'none';
                 return;
             }
@@ -1657,12 +1935,14 @@
             if (activeIdx < 0 && this.lrcLines.length > 0) activeIdx = 0;
 
             // Only rebuild DOM when lyrics content changes (new song)
-            if (container.children.length !== this.lrcLines.length) {
+            var _sig = this.lrcLines.length + '|' + this.lrcLines[0].text + '|' + this.lrcLines[this.lrcLines.length - 1].text;
+            if (container.children.length !== this.lrcLines.length || container._lrcSig !== _sig) {
                 var html = '';
                 for (var j = 0; j < this.lrcLines.length; j++) {
                     html += '<div class="im-lrc-line">' + escapeHtml(this.lrcLines[j].text) + '</div>';
                 }
                 container.innerHTML = html;
+                container._lrcSig = _sig;
             }
 
             // Just update classes on each tick
@@ -2154,7 +2434,7 @@
                     // 加载前先还原 cookie 中的位置
                     if (consented) {
                         (function(){
-                            var savedPos = getCookie('mapi_pos');
+                            var savedPos = _ckGet('mapi_pos');
                             if (savedPos) {
                                 var savedSide = '';
                                 var savedTop = '';

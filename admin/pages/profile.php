@@ -61,7 +61,7 @@ $uid = (int)$_SESSION['admin_id'];
 <div class="cards-grid">
 <div class="card">
   <div class="card-header"><span class="card-title"><?= svg('img') ?> 后台背景图</span></div>
-<?php $adminTheme = $_SESSION['admin_theme_mode'] ?? 'light'; ?>
+<?php $adminTheme = $_SESSION['admin_ui_theme'] ?? 'light'; ?>
     <div class="theme-toggle-row" style="display:flex;align-items:center;justify-content:space-between;padding:0 0 16px 0">
       <span style="font-size:13px;font-weight:600;color:rgba(0,0,0,.55)">后台主题</span>
       <button class="theme-switch<?= $adminTheme === 'dark' ? ' active' : '' ?>" id="themeSwitch" onclick="toggleTheme()" title="切换浅色/深色主题">

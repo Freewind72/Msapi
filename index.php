@@ -1,4 +1,5 @@
 <?php
+set_time_limit(20);
 $configFile = __DIR__ . '/config/config.php';
 if (!file_exists($configFile)) {
     header('Location: install/');
@@ -12,6 +13,7 @@ if (empty($CFG['db']['type'])) {
 }
 require __DIR__ . '/assets/lib/db.php';
 require __DIR__ . '/assets/lib/jwt.php';
+require __DIR__ . '/assets/lib/helpers.php';   // asset_ver()：静态资源版本号
 $RELAY = require __DIR__ . '/admin/api/relay.php';
 $totalCalls = 0; $todayCalls = 0;
 $superKey = ''; $superToken = '';
@@ -58,8 +60,8 @@ if ($superToken) {
 <title>顺雅 · 声波宇宙</title>
 <meta name="description" content="你的网站，自带旋律。">
 <meta name="theme-color" content="#030712">
-<link rel="stylesheet" href="<?= $RELAY['page']['pc_css'] ?>">
-<link rel="stylesheet" href="<?= $RELAY['page']['mobile_css'] ?>">
+<link rel="stylesheet" href="<?= asset_ver($RELAY['page']['pc_css']) ?>">
+<link rel="stylesheet" href="<?= asset_ver($RELAY['page']['mobile_css']) ?>">
 <?php require __DIR__ . $RELAY['asset']['widget_php']; ?>
 </head>
 <body>
@@ -187,7 +189,7 @@ if ($superToken) {
   </div>
 </section>
 
-<script src="<?= $RELAY['page']['pc_js'] ?>"></script>
-<script src="<?= $RELAY['page']['mobile_js'] ?>"></script>
+<script src="<?= asset_ver($RELAY['page']['pc_js']) ?>"></script>
+<script src="<?= asset_ver($RELAY['page']['mobile_js']) ?>"></script>
 </body>
 </html>

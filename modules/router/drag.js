@@ -8,6 +8,7 @@
         function _start(cx, cy) {
             _drag = true; _moved = false; _sx = cx; _sy = cy;
             MP._hostRoot.host.style.transition = 'none'; _actionHandled = false;
+            MP._posBottom = 0;                                 // 用户自己拖了：不再用后台默认的底部锚点
             var r = MP._hostRoot.host.getBoundingClientRect(); ox = cx - r.left; oy = cy - r.top;
             _dragMinTop = -Infinity;
             if (MP.open) {
@@ -26,6 +27,7 @@
             var ty = e.clientY - oy;
             if (ty < _dragMinTop) ty = _dragMinTop;
             MP._hostRoot.host.style.bottom = 'auto'; MP._hostRoot.host.style.top = ty + 'px';
+            MP._posTopUser = ty + 'px';                               // 只记访客自己拖的竖直位置
         }
         function _up() {
             _actionHandled = true;
@@ -40,6 +42,7 @@
             var ty = t.clientY - oy;
             if (ty < _dragMinTop) ty = _dragMinTop;
             MP._hostRoot.host.style.bottom = 'auto'; MP._hostRoot.host.style.top = ty + 'px';
+            MP._posTopUser = ty + 'px';                               // 只记访客自己拖的竖直位置
         }
         function _te() {
             _actionHandled = true;
@@ -71,6 +74,11 @@
     MP._snap = function() {
         var h = MP._hostRoot.host, mr = window.innerWidth <= 768 ? 4 : 15;
         var mb = window.innerWidth <= 768 ? 35 : 50;
+        // 注意：top 为 'auto'/'initial'/空 都算“按底部锚定”；否则 _snap 会误判成 top 定位并把 bottom 清掉
+        function hasTop() {
+            var t = h.style.top;
+            return !!t && t !== '' && t !== 'initial' && t !== 'auto';
+        }
         var hRect = h.getBoundingClientRect();
         var hostW = hRect.width;
         var goLeft = hRect.left + hostW / 2 < window.innerWidth / 2;
@@ -80,29 +88,36 @@
         h.style.transition = 'left .35s cubic-bezier(.34,1.56,.64,1), top .35s cubic-bezier(.34,1.56,.64,1)';
         h.style.left = targetLeft + 'px';
         h.style.right = 'auto';
-        if (!h.style.top || h.style.top === '' || h.style.top === 'initial') {
-            h.style.bottom = mb + 'px';
-        }
-        if (h.style.top && h.style.top !== '') {
-            h.style.bottom = 'auto';
-            var tog = MP.$('toggle');
-            if (tog) {
-                var tr = tog.getBoundingClientRect();
-                var toff = tr.top - h.getBoundingClientRect().top;
-                var th = tr.bottom - tr.top;
-                var cur = parseFloat(h.style.top);
-                if (!isNaN(cur)) {
-                    var minTop = mr - toff;
-                    if (MP.open) {
-                        var pnl = MP.$('panel');
-                        if (pnl) {
-                            var pr = pnl.getBoundingClientRect();
-                            var poff = pr.top - h.getBoundingClientRect().top;
-                            minTop = Math.max(minTop, 4 - poff);
-                        }
-                    }
-                    h.style.top = Math.max(minTop, Math.min(cur, window.innerHeight - toff - th - mr)) + 'px';
+        if (!hasTop()) {
+            // 底部锚定：优先用后台设置的默认位置（MP._posBottom），否则用默认边距
+            var b = MP._posBottom ? MP._posBottom : mb;
+            if (MP.open) {                                   // 面板打开时保证面板顶部不出屏幕
+                var pnlB = MP.$('panel');
+                if (pnlB) {
+                    var ph = pnlB.getBoundingClientRect().height;
+                    var maxB = window.innerHeight - ph - 4;
+                    if (maxB < mb) maxB = mb;
+                    if (b > maxB) b = maxB;
                 }
+            }
+            h.style.bottom = b + 'px';
+        }
+        if (hasTop()) {
+            h.style.bottom = 'auto';
+            var cur = parseFloat(h.style.top);
+            if (!isNaN(cur)) {
+                var hb = h.getBoundingClientRect();
+                var minTop = 4;
+                if (MP.open) {
+                    var pnl = MP.$('panel');
+                    if (pnl) {
+                        var pr = pnl.getBoundingClientRect();
+                        minTop = Math.max(minTop, 4 - (pr.top - hb.top));
+                    }
+                }
+                var maxTop = window.innerHeight - hb.height - 4;   // 按宿主自身高度夹取，避免受隐藏按钮影响
+                if (maxTop < minTop) maxTop = minTop;
+                h.style.top = Math.max(minTop, Math.min(cur, maxTop)) + 'px';
             }
         }
         MP._side = goLeft ? 'left' : 'right';

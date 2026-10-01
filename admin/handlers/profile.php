@@ -6,13 +6,16 @@ if ($action_key === 'profile') {
     csrf_require();
     $uid = (int)$_SESSION['admin_id'];
 
-    // 主题切换
+    // 切换后台界面主题
     if (isset($_POST['_theme_toggle'])) {
         $mode = in_array($_POST['mode'] ?? '', ['light', 'dark']) ? $_POST['mode'] : 'light';
-        $stmt = $db->prepare("UPDATE mapi_users SET theme_mode=? WHERE id=?");
-        $stmt->bind_param('si', $mode, $uid);
-        $stmt->execute();
-        $_SESSION['admin_theme_mode'] = $mode;
+        // 老库可能没有 admin_theme 列：尽力补列；补不上就只在本次会话生效
+        if (mapi_users_ensure_column($db, 'admin_theme', "VARCHAR(10) DEFAULT 'light'")) {
+            $stmt = $db->prepare("UPDATE mapi_users SET admin_theme=? WHERE id=?");
+            $stmt->bind_param('si', $mode, $uid);
+            $stmt->execute();
+        }
+        $_SESSION['admin_ui_theme'] = $mode;
         exit;
     }
 

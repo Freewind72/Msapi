@@ -1,8 +1,5 @@
 <?php
-/**
- * MSAPI 安装后台 API 路由
- * 处理 AJAX 请求：环境检测、权限检查、连接测试、初始化
- */
+// MSAPI 安装后台 API 路由
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 

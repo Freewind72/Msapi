@@ -288,11 +288,17 @@ body::-webkit-scrollbar{display:none}
   flex:1;text-align:center;font-family:'SF Mono','Menlo','Monaco','Consolas',monospace;
   font-size:.7rem;color:#8b949e;letter-spacing:.04em;
 }
-.terminal-body{padding:16px 0;min-height:auto;overflow-x:auto;background:#0d1117}
+/* 注意：body 上设了 scrollbar-width:none，而它是继承属性，会让这里的横向滚动条消失，所以要显式恢复 */
+.terminal-body{padding:16px 0;min-height:auto;overflow-x:auto;background:#0d1117;scrollbar-width:thin;scrollbar-color:#3d444d #161b22}
+.terminal-body::-webkit-scrollbar{height:10px;display:block}
+.terminal-body::-webkit-scrollbar-track{background:#161b22}
+.terminal-body::-webkit-scrollbar-thumb{background:#3d444d;border-radius:6px;border:2px solid #161b22}
+.terminal-body::-webkit-scrollbar-thumb:hover{background:#586069}
 .terminal-line{
   font-family:'SF Mono','Menlo','Monaco','Consolas',monospace;
   font-size:.82rem;line-height:1.7;color:#c9d1d9;
   padding:0 20px;white-space:nowrap;
+  width:max-content;min-width:100%;      /* 整行不被压缩，滚动时高亮条也铺满整行 */
   opacity:0;transform:translateY(4px);
   transition:opacity .3s,transform .3s;
 }
@@ -371,7 +377,12 @@ body::-webkit-scrollbar{display:none}
   overflow-x:auto;font-family:'SF Mono','Menlo','Monaco','Consolas',monospace;
   font-size:.8rem;line-height:1.9;color:var(--text-dim);
   position:relative;white-space:pre;word-break:normal;overflow-wrap:normal;
+  scrollbar-width:thin;scrollbar-color:#3d444d rgba(255,255,255,.05);   /* 同样要显式恢复（body 上的 none 会被继承） */
 }
+.code-block::-webkit-scrollbar{height:10px;display:block}
+.code-block::-webkit-scrollbar-track{background:rgba(255,255,255,.05)}
+.code-block::-webkit-scrollbar-thumb{background:#3d444d;border-radius:6px;border:2px solid transparent;background-clip:content-box}
+.code-block::-webkit-scrollbar-thumb:hover{background:#586069;background-clip:content-box}
 .code-block .cm{color:var(--text-muted);font-style:italic}
 .code-block .t{color:#7a8898}
 .code-block .a{color:var(--text-dim)}

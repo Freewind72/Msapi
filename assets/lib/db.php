@@ -28,6 +28,12 @@ function db_connect() {
 
 class DB_Mysql {
     private $mysqli;
+    private $hosts;
+    private $user;
+    private $pass;
+    private $dbname;
+    private $port;
+    private $lastHostIdx = 0;
     public $affected_rows;
     public $insert_id;
     public $error;
@@ -35,28 +41,56 @@ class DB_Mysql {
     public $num_rows = 0;
 
     public function __construct($hosts, $user, $pass, $db, $port) {
+        $this->hosts = is_array($hosts) ? $hosts : [$hosts];
+        $this->user = $user;
+        $this->pass = $pass;
+        $this->dbname = $db;
+        $this->port = (int)$port;
+        $this->_connect();
+    }
+
+    private function _connect() {
         $this->mysqli = null;
-        if (!is_array($hosts) || empty($hosts)) {
+        if (empty($this->hosts)) {
             $this->connect_error = 'No hosts configured';
-            return;
+            return false;
         }
-        foreach ($hosts as $host) {
+        $total = count($this->hosts);
+        for ($attempt = 0; $attempt < $total; $attempt++) {
+            $hostIdx = ($this->lastHostIdx + $attempt) % $total;
+            $host = 'p:' . $this->hosts[$hostIdx];
             try {
-                $this->mysqli = @new mysqli('p:' . $host, $user, $pass, $db, (int)$port);
-                if ($this->mysqli->connect_error) {
-                    $this->mysqli = @new mysqli($host, $user, $pass, $db, (int)$port);
+                $m = mysqli_init();
+                if (!$m) { $this->connect_error = 'mysqli_init failed'; continue; }
+                mysqli_options($m, MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+                mysqli_options($m, MYSQLI_OPT_READ_TIMEOUT, 10);
+                mysqli_options($m, MYSQLI_OPT_LOCAL_INFILE, false);
+                $ok = @mysqli_real_connect($m, $host, $this->user, $this->pass, $this->dbname, $this->port);
+                if (!$ok) {
+                    $this->connect_error = mysqli_connect_error() ?: 'connect failed';
+                    @mysqli_close($m);
+                    continue;
                 }
-                if (!$this->mysqli->connect_error) {
-                    $this->mysqli->set_charset('utf8mb4');
-                    $this->connect_error = null;
-                    return;
-                }
-                $this->connect_error = $this->mysqli->connect_error;
+                mysqli_set_charset($m, 'utf8mb4');
+                @mysqli_query($m, "SET session wait_timeout=28800, interactive_timeout=28800, autocommit=1");
+                $this->mysqli = $m;
+                $this->connect_error = null;
+                $this->lastHostIdx = $hostIdx;
+                return true;
             } catch (Throwable $e) {
                 $this->connect_error = $e->getMessage();
             }
         }
         error_log('MAPI DB connection failed: all hosts unreachable');
+        return false;
+    }
+
+    private function _ensureAlive() {
+        if ($this->mysqli === null) return false;
+        if (@mysqli_ping($this->mysqli)) return true;
+        @mysqli_close($this->mysqli);
+        $this->mysqli = null;
+        return $this->_connect();
     }
 
     private function _ok() {
@@ -64,11 +98,19 @@ class DB_Mysql {
     }
 
     public function query($sql) {
-        if (!$this->_ok()) { $this->error = $this->connect_error ?? 'DB not connected'; return false; }
-        $r = $this->mysqli->query($sql);
+        if (!$this->_ensureAlive()) { $this->error = $this->connect_error ?? 'DB not connected'; return false; }
+        $r = @$this->mysqli->query($sql);
         if ($r === false) {
-            $this->error = $this->mysqli->error;
-            return false;
+            $code = $this->mysqli->errno;
+            if ($code === 2006 || $code === 2013) {
+                if ($this->_connect()) {
+                    $r = @$this->mysqli->query($sql);
+                }
+            }
+            if ($r === false) {
+                $this->error = $this->mysqli->error;
+                return false;
+            }
         }
         $this->affected_rows = $this->mysqli->affected_rows;
         $this->insert_id = $this->mysqli->insert_id;
@@ -82,27 +124,38 @@ class DB_Mysql {
     }
 
     public function prepare($sql) {
-        if (!$this->_ok()) { $this->error = $this->connect_error ?? 'DB not connected'; return false; }
-        $stmt = $this->mysqli->prepare($sql);
+        if (!$this->_ensureAlive()) { $this->error = $this->connect_error ?? 'DB not connected'; return false; }
+        $stmt = @$this->mysqli->prepare($sql);
         if (!$stmt) {
-            $this->error = $this->mysqli->error;
-            return false;
+            $code = $this->mysqli->errno;
+            if ($code === 2006 || $code === 2013) {
+                if ($this->_connect()) {
+                    $stmt = @$this->mysqli->prepare($sql);
+                }
+            }
+            if (!$stmt) {
+                $this->error = $this->mysqli->error;
+                return false;
+            }
         }
         return new DB_MysqlStmt($stmt, $this);
     }
 
     public function real_escape_string($str) {
-        if (!$this->_ok()) return $str;
+        if (!$this->_ensureAlive()) return $str;
         return $this->mysqli->real_escape_string($str);
     }
 
     public function set_charset($charset) {
-        if (!$this->_ok()) return;
+        if (!$this->_ensureAlive()) return;
         $this->mysqli->set_charset($charset);
     }
 
     public function close() {
-        if ($this->mysqli) $this->mysqli->close();
+        if ($this->mysqli) {
+            @mysqli_close($this->mysqli);
+            $this->mysqli = null;
+        }
     }
 
     public function __get($name) {

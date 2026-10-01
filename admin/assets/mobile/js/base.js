@@ -1,92 +1,197 @@
 var _toast=document.getElementById('toast'),_tt=null;
 function showToast(m,t){_toast.textContent=m;_toast.className='show '+(t||'ok');clearTimeout(_tt);_tt=setTimeout(function(){_toast.className=''},2500)}
+function showConfirm(e,f,m){e.preventDefault();if(!confirm(m))return false;f.submit();return false}
 
-var tpill=document.getElementById('topbarPill'),tnav=document.getElementById('topbarNav');
-function moveTopPill(){if(!tpill||!tnav||tnav.offsetParent===null)return;var a=tnav.querySelector('.topbar-nav-item.active');if(!a){tpill.style.display='none';return}var r=a.getBoundingClientRect(),tr=tpill.parentNode.getBoundingClientRect();tpill.style.display='';tpill.style.left=(r.left-tr.left)+'px';tpill.style.top=(r.top-tr.top)+'px';tpill.style.width=r.width+'px';tpill.style.height=r.height+'px'}
-
-var _navigating=false;
+var _navigating=false,_navAbort=null,_navTimer=null;
 (function(){
 history.scrollRestoration='manual';
 var navActions=['dashboard','keys','users','config','settings','profile','playlist-detail'];
-var bnav=document.getElementById('bottomNav'),bpill=document.getElementById('navPill');
-
-function movePill(){
-  if(!bnav||!bpill||bnav.offsetWidth===0)return;
-  var a=bnav.querySelector('.nav-item.active');
-  if(!a){bpill.style.display='none';return}
-  bpill.style.display='';
-  bpill.style.transform='translateX('+(a.offsetLeft+a.offsetWidth/2-22)+'px)';
-}
 
 function setActiveNav(action){
   document.querySelectorAll('.topbar-nav-item').forEach(function(el){
     el.classList.toggle('active',el.getAttribute('href')==='?action='+action);
   });
-  moveTopPill();
   document.querySelectorAll('.bottom-nav .nav-item').forEach(function(el){
-    var h=el.getAttribute('href');
-    if(h&&h.indexOf('?action=')===0)el.classList.toggle('active',h==='?action='+action);
+    el.classList.toggle('active',el.getAttribute('href')==='?action='+action);
   });
-  movePill();
+  positionNavPill();
 }
 
-function loadPageJs(doc,cb){
-  var nj=doc.getElementById('page-js');
-  var cj=document.getElementById('page-js');
-  if(!nj){if(cj)cj.remove();cb();return}
-  if(cj&&cj.src===nj.src){cb();return}
-  if(cj)cj.remove();
-  var s=document.createElement('script');s.id='page-js';s.src=nj.src;
-  s.onload=cb;s.onerror=cb;document.body.appendChild(s);
+// 底部导航水珠：居中到当前项（首次不带动画，避免加载时从最左滑过来）
+var _navPillReady=false,_navPillTries=0;
+function positionNavPill(){
+  var nav=document.getElementById('bottomNav'),pill=document.getElementById('navPill');
+  if(!nav||!pill)return;
+  var items=nav.querySelectorAll('.nav-item');
+  if(!items.length||!pill.offsetWidth){
+    if(_navPillTries<10){_navPillTries++;setTimeout(positionNavPill,100)}   // 样式未就绪：最多再试 10 次
+    return;
+  }
+  _navPillTries=0;
+  var cur=null;
+  for(var i=0;i<items.length;i++){if(items[i].classList.contains('active')){cur=items[i];break}}
+  if(!cur)cur=items[0];
+  var x=Math.round((cur.offsetLeft+cur.offsetWidth/2)-(pill.offsetLeft+pill.offsetWidth/2));
+  if(!_navPillReady){
+    _navPillReady=true;
+    pill.style.transition='none';
+    pill.style.transform='translateX('+x+'px)';
+    void pill.offsetWidth;
+    requestAnimationFrame(function(){pill.style.transition=''});
+    return;
+  }
+  pill.style.transform='translateX('+x+'px)';
+}
+
+// 首次渲染、窗口变化、导航尺寸变化时重新定位水珠
+var _navPillTimer=null;
+positionNavPill();
+window.addEventListener('load',positionNavPill);
+window.addEventListener('resize',function(){clearTimeout(_navPillTimer);_navPillTimer=setTimeout(positionNavPill,120)});
+window.addEventListener('orientationchange',function(){setTimeout(positionNavPill,200)});
+(function(){
+  var navEl=document.getElementById('bottomNav');
+  if(navEl&&window.ResizeObserver){try{new ResizeObserver(positionNavPill).observe(navEl)}catch(e){}}
+})();
+
+// 页面样式原子切换: 新样式就绪后才替换旧样式, 避免"CSS 丢失 / 无样式"的中间态.
+function swapPageCss(href,proceed){
+  var old=document.getElementById('page-css');
+  var proceeded=false,settled=false;
+  function goOn(){if(proceeded)return;proceeded=true;proceed()}
+  if(!href){if(old&&old.parentNode)old.parentNode.removeChild(old);goOn();return}
+  if(old&&old.getAttribute('href')===href){goOn();return}
+  var next=document.createElement('link');
+  next.rel='stylesheet';next.setAttribute('href',href);next.media='not all';
+  function apply(ok){
+    if(settled)return;settled=true;
+    if(ok){
+      next.media='all';
+      if(old&&old.parentNode)old.parentNode.removeChild(old);
+      next.id='page-css';
+    }else if(next.parentNode){next.parentNode.removeChild(next)}
+  }
+  next.onload=function(){apply(true);goOn()};
+  next.onerror=function(){apply(false);goOn()};
+  // 插在旧样式原位，保持层叠顺序不变
+  if(old&&old.parentNode){old.parentNode.insertBefore(next,old.nextSibling)}else{document.head.appendChild(next)}
+  setTimeout(goOn,1500);
+  setTimeout(function(){apply(false)},8000);
+}
+
+function loadPageScripts(src,cb){
+  var cur=document.getElementById('page-js');
+  if(!src){if(cur)cur.remove();cb();return}
+  if(cur&&cur.getAttribute('src')===src&&cur.getAttribute('data-loaded')==='1'){cb();return}
+  if(cur)cur.remove();
+  var s=document.createElement('script');
+  s.id='page-js';s.src=src;
+  s.onload=function(){s.setAttribute('data-loaded','1');cb()};
+  s.onerror=cb;document.body.appendChild(s);
+}
+
+function runPageScripts(scope){
+  scope.querySelectorAll('script').forEach(function(s){
+    if(!s.textContent.trim())return;
+    var m=s.textContent.match(/showToast\('((?:[^'\\]|\\.)*)','((?:[^'\\]|\\.)*)'/);
+    if(m){showToast(m[1],m[2]);return}
+    try{new Function(s.textContent)()}catch(e){console.warn('[navigateTo] 页面内联脚本执行失败:',e)}
+  });
+  try{if(typeof updateTestPlayerButtons==='function')updateTestPlayerButtons()}catch(e){}
+  try{if(typeof initDebugExpand==='function')initDebugExpand()}catch(e){}
+  try{initCodeMirror()}catch(e){}
+}
+
+function navPending(on){document.body.style.cursor=on?'progress':''}
+
+// 播放器后台预加载的暂停/恢复：切页期间先取消在途的预加载请求（单线程服务器下能显著降低切页等待）
+function pausePlayerPreload(){
+  var MP=window.__mapiPlayer;
+  if(MP&&typeof MP.pausePreload==='function'){try{MP.pausePreload();return}catch(e){}}
+  window.__mapiPrefetchPaused=true;
+}
+function resumePlayerPreload(){
+  var MP=window.__mapiPlayer;
+  if(MP&&typeof MP.resumePreload==='function'){try{MP.resumePreload();return}catch(e){}}
+  window.__mapiPrefetchPaused=false;
+}
+
+function finishNav(ctrl){
+  if(_navAbort!==ctrl)return;          // 已被更新的导航接管，状态由新导航收尾
+  _navAbort=null;_navigating=false;
+  clearTimeout(_navTimer);_navTimer=null;
+  navPending(false);
+  resumePlayerPreload();               // 切页结束，恢复后台预加载（带 0.8s 安静期）
+}
+
+function applyPage(wrap,html,doc,url,push,keepScroll){
+  var scr=keepScroll?wrap.scrollTop:0;
+  // 切页前清掉上一页挪到 body 下的弹窗：否则重复 ID 越积越多（编辑弹窗填不进内容、旧浮层还会挡住点击）
+  document.querySelectorAll('body > .song-modal').forEach(function(el){el.remove()});
+  // 页面内容每次都是全新的 DOM，页面脚本必须重新执行，否则新 DOM 上没有任何监听（点“编辑/添加”会没反应）
+  var pj=document.getElementById('page-js');if(pj)pj.remove();
+  wrap.innerHTML=html;
+  wrap.classList.remove('nav-out');
+  wrap.classList.remove('nav-in');
+  void wrap.offsetHeight;
+  wrap.classList.add('nav-in');
+  setTimeout(function(){wrap.classList.remove('nav-in')},420);
+  document.title=doc.title;
+  var a=new URL(url,location.origin).searchParams.get('action');
+  if(a&&navActions.indexOf(a)!==-1)setActiveNav(a);
+  if(push!==false&&url!==location.href)history.pushState(null,'',url);
+  if(keepScroll){wrap.scrollTop=scr}else{wrap.scrollTo(0,0)}
+  // 内容刚换上来时先刷一次播放器按钮: 此时页面 JS 可能还没加载完,
+  try{if(typeof updateTestPlayerButtons==='function')updateTestPlayerButtons()}catch(e){}
 }
 
 function navigateTo(url,push){
   var wrap=document.querySelector('.wrap');
   if(!wrap){window.location.href=url;return}
-  if(_navigating)return;
-  _navigating=true;
-  wrap.classList.add('nav-out');
-  fetch(url)
+  // 取消上一次未完成的切换，而不是把界面锁死（原来 _navigating 一旦置位就会吞掉所有点击）
+  if(_navAbort){try{_navAbort.abort()}catch(e){}}
+  var ctrl=('AbortController' in window)?new AbortController():null;
+  _navAbort=ctrl;_navigating=true;navPending(true);
+  pausePlayerPreload();                  // 取消/暂停播放器后台预加载，切页请求不用排队等它
+  clearTimeout(_navTimer);
+  _navTimer=setTimeout(function(){if(ctrl){try{ctrl.abort()}catch(e){}}},15000);
+  // 不在请求期间隐藏页面：切换等待期间用户仍能看到、滚动当前页面
+  fetch(url,{signal:ctrl?ctrl.signal:undefined,credentials:'same-origin'})
     .then(function(r){if(!r.ok)throw Error('http '+r.status);return r.text()})
     .then(function(html){
+      if(_navAbort!==ctrl)return;
       var doc=new DOMParser().parseFromString(html,'text/html');
       var nw=doc.querySelector('.wrap');
-      if(!nw){console.error('[navigateTo] .wrap not found, staying on current page. First 200 chars:',html.substring(0,200));wrap.classList.remove('nav-out');_navigating=false;return}
-      setTimeout(function(){
-        wrap.innerHTML=nw.innerHTML;
-        wrap.classList.remove('nav-out');
-        wrap.classList.add('nav-in');
-        setTimeout(function(){wrap.classList.remove('nav-in');_navigating=false},420);
-        document.title=doc.title;
-        var nc=doc.querySelector('#page-css');
-        if(nc){var oc=document.querySelector('#page-css');if(oc)oc.href=nc.href}
-        var a=new URL(url,location.origin).searchParams.get('action');
-        if(a&&navActions.indexOf(a)!==-1)setActiveNav(a);
-        if(push!==false)history.pushState(null,'',url);
-        loadPageJs(doc,function(){
-          wrap.querySelectorAll('script').forEach(function(s){
-            if(!s.textContent.trim())return;
-            var m=s.textContent.match(/showToast\('((?:[^'\\]|\\.)*)','((?:[^'\\]|\\.)*)'/);
-            if(m){showToast(m[1],m[2]);return}
-            try{new Function(s.textContent)()}catch(e){}
-          });
-          if(typeof updateTestPlayerButtons==='function') updateTestPlayerButtons();
-          if(typeof initDebugExpand==='function') initDebugExpand();
-          initCodeMirror();
-          wrap.scrollTo(0,0);
-        });
-      },200);
+      if(!nw){console.error('[navigateTo] .wrap not found, staying on current page.');finishNav(ctrl);return}
+      var nc=doc.querySelector('#page-css');
+      var nj=doc.getElementById('page-js');
+      // 内容立刻切换（不再等新样式下载完）：样式在后台原子替换，新样式就绪前旧样式继续生效，不会丢样式
+      applyPage(wrap,nw.innerHTML,doc,url,push,false);
+      swapPageCss(nc?nc.getAttribute('href'):null,function(){});
+      loadPageScripts(nj?nj.getAttribute('src'):null,function(){
+        if(_navAbort!==ctrl)return;
+        runPageScripts(wrap);
+        finishNav(ctrl);
+      });
     })
-    .catch(function(e){console.error('[navigateTo] fetch failed, staying on current page:',e);wrap.classList.remove('nav-out');_navigating=false});
+    .catch(function(e){
+      if(_navAbort!==ctrl)return;
+      console.warn('[navigateTo] 切换失败，保留当前页面:',e);
+      finishNav(ctrl);
+    });
 }
 window.navigateTo=navigateTo;
+
+var sb=document.getElementById('sidebar'),sbb=document.getElementById('sbBrand');
+function applyCollapse(c){sb.classList.toggle('collapsed',c);if(sbb){var t=c?'展开侧边栏':'折叠侧边栏';sbb.setAttribute('title',t);sbb.setAttribute('aria-label',t)}}
+if(sb&&sbb){var isCollapsed=localStorage.getItem('sidebar_collapsed')==='1';applyCollapse(isCollapsed);sbb.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();var c=!sb.classList.contains('collapsed');applyCollapse(c);localStorage.setItem('sidebar_collapsed',c?'1':'0')})}
 
 document.addEventListener('click',function(e){
   var link=e.target.closest('a[href^="?action="]');
   if(!link)return;
   var a=new URL(link.href,location.origin).searchParams.get('action');
   if(a==='logout'||navActions.indexOf(a)===-1)return;
-  if(link.classList.contains('active')||_navigating){e.preventDefault();return;}
+  if(link.classList.contains('active')){e.preventDefault();return;}
   e.preventDefault();
   navigateTo(link.href);
 });
@@ -95,6 +200,7 @@ document.addEventListener('submit',function(e){
   if(e.defaultPrevented)return;
   var f=e.target;
   if(f.method!=='post')return;
+  if(f.hasAttribute('data-modal'))return;
   var act=(f.getAttribute('action')||'').trim()||location.href;
   if(act.indexOf('?action=')===-1)return;
   e.preventDefault();
@@ -106,75 +212,44 @@ document.addEventListener('submit',function(e){
   var targetAct=new URL(act,location.origin).searchParams.get('action')||'';
   var currentAct=new URL(location.href).searchParams.get('action')||'';
   var samePage=targetAct===currentAct;
-  if(!samePage)ow.classList.add('nav-out');
+  // 不再在请求期间隐藏页面：等结果回来再切换，避免“点一下页面就消失、迟迟不回来”
+  navPending(true);
+  pausePlayerPreload();
   fetch(f.action||location.href,{method:'POST',body:new FormData(f)})
     .then(function(r){if(!r.ok)throw Error();var u=r.url;return r.text().then(function(h){return{html:h,url:u}})})
     .then(function(res){
       var doc=new DOMParser().parseFromString(res.html,'text/html');
-      var nw=doc.querySelector('.wrap');if(!nw){if(!samePage)ow.classList.remove('nav-out');window.location.href=f.action||location.href;return}
+      var nw=doc.querySelector('.wrap');if(!nw){window.location.href=f.action||location.href;return}
+      var nc=doc.querySelector('#page-css');
+      var nj=doc.getElementById('page-js');
+      var cssHref=nc?nc.getAttribute('href'):null;
+      var jsSrc=nj?nj.getAttribute('src'):null;
       if(samePage){
         var scr=ow.scrollTop;
         ow.innerHTML=nw.innerHTML;
         document.title=doc.title;
-        var nc0=doc.querySelector('#page-css');
-        if(nc0){var oc0=document.querySelector('#page-css');if(oc0)oc0.href=nc0.href}
         var a0=new URL(res.url,location.origin).searchParams.get('action');
         if(a0&&navActions.indexOf(a0)!==-1)setActiveNav(a0);
         if(res.url!==location.href)history.pushState(null,'',res.url);
-        loadPageJs(doc,function(){
-          ow.querySelectorAll('script').forEach(function(s){
-            if(!s.textContent.trim())return;
-            var m=s.textContent.match(/showToast\('((?:[^'\\]|\\.)*)','((?:[^'\\]|\\.)*)'/);
-            if(m){showToast(m[1],m[2]);return}
-            try{new Function(s.textContent)()}catch(e){}
-          });
-          if(typeof updateTestPlayerButtons==='function')updateTestPlayerButtons();
-          if(typeof initDebugExpand==='function')initDebugExpand();
-          initCodeMirror();
+        swapPageCss(cssHref,function(){});
+        loadPageScripts(jsSrc,function(){
+          runPageScripts(ow);
           ow.scrollTop=scr;
         });
         return;
       }
-      setTimeout(function(){
-        ow.innerHTML=nw.innerHTML;
-        ow.classList.remove('nav-out');
-        void ow.offsetHeight;
-        ow.classList.add('nav-in');
-        setTimeout(function(){ow.classList.remove('nav-in')},420);
-        document.title=doc.title;
-        var nc=doc.querySelector('#page-css');
-        if(nc){var oc=document.querySelector('#page-css');if(oc)oc.href=nc.href}
-        var a=new URL(res.url,location.origin).searchParams.get('action');
-        if(a&&navActions.indexOf(a)!==-1)setActiveNav(a);
-        if(res.url!==location.href)history.pushState(null,'',res.url);
-        loadPageJs(doc,function(){
-          ow.querySelectorAll('script').forEach(function(s){
-            if(!s.textContent.trim())return;
-            var m=s.textContent.match(/showToast\('((?:[^'\\]|\\.)*)','((?:[^'\\]|\\.)*)'/);
-            if(m){showToast(m[1],m[2]);return}
-            try{new Function(s.textContent)()}catch(e){}
-          });
-          if(typeof updateTestPlayerButtons==='function')updateTestPlayerButtons();
-          if(typeof initDebugExpand==='function')initDebugExpand();
-          initCodeMirror();
-          ow.scrollTo(0,0);
-        });
-      },240);
+      applyPage(ow,nw.innerHTML,doc,res.url,true,false);
+      swapPageCss(cssHref,function(){});
+      loadPageScripts(jsSrc,function(){ runPageScripts(ow); });
     })
-    .catch(function(){if(!samePage&&ow)ow.classList.remove('nav-out');window.location.href=f.action||location.href})
-    .finally(function(){if(btn){btn.disabled=false;btn.textContent=origTxt}});
+    .catch(function(){window.location.href=f.action||location.href})
+    .finally(function(){navPending(false);resumePlayerPreload();if(btn){btn.disabled=false;btn.textContent=origTxt}});
 });
 
 window.addEventListener('popstate',function(){
   navigateTo(location.href,false);
 });
-
-if(bpill){bpill.style.transition='none';movePill();bpill.offsetHeight;bpill.style.transition=''}
-
-window.addEventListener('resize',function(){moveTopPill();movePill()});
 })();
-
-(function(){if(tpill){tpill.style.transition='none';moveTopPill();tpill.offsetHeight;tpill.style.transition=''}})();
 
 function copyEmbedKey(key){
   var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/modules/api.php?route=router')+'" key="'+key+'"><\/script>';
@@ -182,6 +257,7 @@ function copyEmbedKey(key){
 }
 
 function initCodeMirror() {
+  if (typeof CodeMirror === 'undefined') return;
   var ta = document.querySelector('textarea[name="mail_tpl_body"]');
   if (!ta) return;
   if (ta.nextSibling && ta.nextSibling.classList && ta.nextSibling.classList.contains('CodeMirror')) return;
@@ -216,7 +292,7 @@ function initCodeMirror() {
 initCodeMirror();
 
 (function(){
-  var curUser = (document.querySelector('.topbar-username') || {}).textContent || '';
+  var curUser = (document.querySelector('.sb-username') || {}).textContent || '';
   var pusher = new Pusher('333723b6068a283d1b6b', { cluster: 'ap3', channelAuthorization: { endpoint: '?action=pusher-auth', transport: 'ajax' } });
   var channel = pusher.subscribe('presence-admin-online');
 

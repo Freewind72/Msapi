@@ -122,10 +122,12 @@
                 if (_a && _a._lrc && _a._lrc.indexOf('\u6b64\u6b4c\u66f2\u4e3a\u6ca1\u6709\u586b\u8bcd\u7684\u7eaf\u97f3\u4e50') >= 0) {
                     if (wrap) wrap.style.display = '';
                     container.innerHTML = '<div class="im-lrc-line active">\u6b64\u6b4c\u66f2\u4e3a\u6ca1\u6709\u586b\u8bcd\u7684\u7eaf\u97f3\u4e50\uff0c\u8bf7\u60a8\u6b23\u8d4f</div>';
+                    container._lrcSig = '__placeholder__';
                     return;
                 }
             } catch(e) {}
             container.innerHTML = '';
+            container._lrcSig = '';
             if (wrap) wrap.style.display = 'none';
             return;
         }
@@ -137,12 +139,15 @@
         }
         if (activeIdx < 0 && MP.lrcLines.length > 0) activeIdx = 0;
 
-        if (container.children.length !== MP.lrcLines.length) {
+        // 换歌后必须重建 DOM: 只比较行数时, 两首歌行数相同就会残留上一首的歌词.
+        var _sig = MP.lrcLines.length + '|' + MP.lrcLines[0].text + '|' + MP.lrcLines[MP.lrcLines.length - 1].text;
+        if (container.children.length !== MP.lrcLines.length || container._lrcSig !== _sig) {
             var html = '';
             for (var j = 0; j < MP.lrcLines.length; j++) {
                 html += '<div class="im-lrc-line">' + _.escapeHtml(MP.lrcLines[j].text) + '</div>';
             }
             container.innerHTML = html;
+            container._lrcSig = _sig;
         }
 
         for (var k = 0; k < container.children.length; k++) {

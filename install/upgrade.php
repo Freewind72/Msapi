@@ -1,11 +1,5 @@
 <?php
-/**
- * MSAPI 增量建表/升级 调度入口
- *
- * 每次访问首页/后台时 require 此文件。
- * 检测缺失的表和列，自动补齐。
- * 后续迭代只需在 lib/migrations.php 追加新定义。
- */
+// MSAPI 增量建表/升级 调度入口
 defined('MAPI_ADMIN') or define('MAPI_ADMIN', false);
 
 $cfg     = null;

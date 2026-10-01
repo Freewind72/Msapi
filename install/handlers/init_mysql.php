@@ -19,7 +19,11 @@ try {
     $m->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $m->exec("USE `{$dbname}`");
 
-    $ourTables = array_keys(get_table_definitions('mysql'));
+    // 结构以 install/lib/migrations.php 为唯一来源：建表 / 补列 / 补索引与"每次访问的增量"同一套逻辑
+    require_once __DIR__ . '/../lib/migrations.php';
+    require_once __DIR__ . '/../lib/up_mysql.php';
+
+    $ourTables = array_keys(get_migrations());
     $existing = $m->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
     $cleaned  = 0;
     foreach ($existing as $tbl) {
@@ -33,11 +37,8 @@ try {
         stream_line('[清理] 无冗余');
     }
 
-    $tables = get_table_definitions('mysql');
-    foreach ($tables as $name => $sql) {
-        $m->exec($sql);
-        stream_line("[建表] {$name}");
-    }
+    schema_sync_mysql($m);
+    stream_line('[数据库] 表结构已同步（缺失的表 / 列 / 索引自动补齐）');
 
     $username = $input['username'] ?? 'admin';
     $password = password_hash($input['password'], PASSWORD_BCRYPT);

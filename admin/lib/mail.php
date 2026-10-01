@@ -1,8 +1,6 @@
 <?php defined('MAPI_ADMIN') or die('禁止直接访问');
 
-/**
- * 发送邮件 - 从数据库读取 SMTP 配置
- */
+// 发送邮件 - 从数据库读取 SMTP 配置
 function sendMail(string $to, string $subj, string $body, bool $isHtml = false): string {
     global $db;
 
@@ -34,9 +32,7 @@ function sendMail(string $to, string $subj, string $body, bool $isHtml = false):
     );
 }
 
-/**
- * 底层 SMTP 发送 - 使用原生 socket 通信
- */
+// 底层 SMTP 发送 - 使用原生 socket 通信
 function mail_send_raw(
     string $host,
     int $port,

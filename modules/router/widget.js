@@ -5,18 +5,19 @@
 MP._css = '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;font-family:-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif}'+
 '[data-mp="root"]{position:relative;display:flex;flex-direction:column;align-items:flex-end;pointer-events:none}'+
 '[data-mp="root"]>*{pointer-events:auto}'+
-'[data-mp="toggle"]{position:absolute;z-index:2147483648;bottom:-28px;right:0;width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,.85);background:rgba(255,255,255,.4);backdrop-filter:blur(12px) saturate(200%);color:#1a1a2e;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.1);filter:drop-shadow(0 0 10px rgba(255,255,255,.35));transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s,box-shadow .3s,filter .3s;touch-action:manipulation;user-select:none}'+
-'@keyframes mpPulse{0%,100%{box-shadow:0 4px 16px rgba(0,0,0,.1),0 0 0 0 rgba(255,255,255,.4);opacity:1;transform:scale(1)}50%{box-shadow:0 4px 16px rgba(0,0,0,.1),0 0 0 12px rgba(255,255,255,0);opacity:.5;transform:scale(.92)}}'+
-'@keyframes mpPulseDark{0%,100%{box-shadow:0 2px 10px rgba(0,0,0,.2),0 0 0 0 rgba(255,255,255,.08);opacity:1;transform:scale(1)}50%{box-shadow:0 2px 10px rgba(0,0,0,.2),0 0 0 12px rgba(255,255,255,0);opacity:.5;transform:scale(.92)}}'+
+'[data-mp="toggle"]{position:absolute;z-index:2147483648;bottom:-28px;right:0;width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,.85);background:rgba(255,255,255,.4);backdrop-filter:blur(12px) saturate(200%);-webkit-backdrop-filter:blur(12px) saturate(200%);color:#1a1a2e;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.1),0 0 10px rgba(255,255,255,.35);transform:translateZ(0);transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s;touch-action:manipulation;user-select:none}'+
+'@keyframes mpPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.92)}}'+
+'@keyframes mpPulseDark{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.92)}}'+
 '@keyframes mpSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'+
 '[data-mp="toggleSvg"]{display:block}'+
-'[data-mp="toggleCover"]{border-radius:50%;object-fit:cover;animation:mpSpin 8s linear infinite;animation-play-state:paused}'+
+'[data-mp="toggleCover"]{border-radius:50%;object-fit:cover;animation:mpSpin 8s linear infinite;animation-play-state:paused;will-change:transform;transform:translateZ(0)}'+
 '[data-mp="toggle"].loading{animation:mpPulse 1.2s ease-in-out infinite}'+
 '[data-mp="toggle"].playing [data-mp="toggleCover"]{animation-play-state:running}'+
-'@media(min-width:769px){[data-mp="toggle"]:hover{transform:translateX(0)!important;box-shadow:0 6px 24px rgba(0,0,0,.15)}}'+
+'@media(min-width:769px){[data-mp="toggle"]:hover{transform:translateX(0) translateZ(0)!important;border-color:rgba(255,255,255,.95);background:rgba(255,255,255,.55)}}'+
 '@media(max-width:768px){[data-mp="toggle"]{transform:translateX(0)}}'+
 '[data-mp="panel"]{position:relative;background:rgba(255,255,255,.36);backdrop-filter:blur(24px) saturate(200%);border:1px solid rgba(255,255,255,.7);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.12);width:320px;margin-bottom:30px;padding:16px;transform:translateY(20px) scale(.95);opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.34,1.56,.64,1);transform-origin:bottom right}'+
-'[data-mp="panel"].open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto}'+
+'[data-mp="panel"]:not(.open){visibility:hidden;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'+
+'[data-mp="panel"].open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto;visibility:visible}'+
 '.info{display:flex;align-items:center;gap:12px;margin-bottom:12px}'+
 '.cover{width:48px;height:48px;border-radius:10px;background:rgba(0,0,0,.05);flex-shrink:0;overflow:hidden}'+
 '.cover img{width:100%;height:100%;object-fit:cover}'+
@@ -32,7 +33,7 @@ MP._css = '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-colo
 '.ptime{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999;margin-top:3px}'+
 '.controls{display:flex;align-items:center;justify-content:center;gap:8px}'+
 '.cbtn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.06);backdrop-filter:blur(8px)saturate(200%);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#1a1a2e;transition:all .2s;padding:0;box-shadow:0 0 10px rgba(255,255,255,.2),0 0 20px rgba(255,255,255,.1)}'+
-'.cbtn:hover{background:rgba(255,255,255,.2);transform:scale(1.05);box-shadow:0 0 14px rgba(255,255,255,.35),0 0 28px rgba(255,255,255,.15)}'+
+'.cbtn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.6);transform:scale(1.05)}'+
 '.cbtn svg{width:18px;height:18px}'+
 '.playbtn{width:44px;height:44px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.08);backdrop-filter:blur(8px)saturate(200%);box-shadow:0 0 12px rgba(255,255,255,.25),0 0 24px rgba(255,255,255,.12)}'+
 '.mvol{display:flex;align-items:center;gap:6px;margin-top:8px}'+
@@ -120,7 +121,7 @@ MP._css = '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-colo
 '.im-time{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#999}'+
 '.im-controls{display:flex;align-items:center;gap:16px;margin-top:8px}'+
 '.im-btn{width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.06);backdrop-filter:blur(8px)saturate(200%);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#1a1a2e;transition:all .2s;padding:0;box-shadow:0 0 10px rgba(255,255,255,.2),0 0 20px rgba(255,255,255,.1)}'+
-'.im-btn:hover{background:rgba(255,255,255,.2);transform:scale(1.05);box-shadow:0 0 14px rgba(255,255,255,.35),0 0 28px rgba(255,255,255,.15)}'+
+'.im-btn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.6);transform:scale(1.05)}'+
 '.im-btn svg{width:22px;height:22px}'+
 '.im-playbtn{width:64px;height:64px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.08);backdrop-filter:blur(8px)saturate(200%);box-shadow:0 0 12px rgba(255,255,255,.25),0 0 24px rgba(255,255,255,.12);color:#1a1a2e}'+
 '.im-playbtn:hover{background:rgba(255,255,255,.12)}'+
@@ -141,8 +142,8 @@ MP._css = '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-colo
 '.panel-action-btn:hover{background:rgba(255,255,255,.35);color:#1a1a2e}'+
 '@media(max-width:768px){.im-cover-wrap{width:200px;height:200px}.im-title{font-size:20px}.im-artist{font-size:14px}.im-content{gap:18px}.im-lrc{height:120px}.im-lrc-line{font-size:13px}.im-lrc-line.active{font-size:15px}.im-btn{width:42px;height:42px}.im-btn svg{width:18px;height:18px}.im-playbtn{width:56px;height:56px}.pc-only{display:none!important}.im-slist-dropdown{position:fixed;top:auto;bottom:0;left:0;right:0;margin:0;min-width:auto;max-height:50vh;width:100%;border-radius:16px 16px 0 0;z-index:2147483647;transform:translateY(100%);padding:8px 0 20px;border-bottom:none;box-shadow:0 -4px 24px rgba(0,0,0,.12)}.im-slist-dropdown.open{transform:translateY(0)}}'+
 '@media(min-width:1025px){.im-content{max-width:620px;gap:28px}.im-cover-wrap{width:320px;height:320px;border-radius:24px}.im-title{font-size:28px}.im-artist{font-size:18px;margin-top:6px}.im-lrc{height:160px}.im-lrc-line{font-size:15px;padding:4px 0}.im-lrc-line.active{font-size:17px}.im-btn{width:52px;height:52px}.im-btn svg{width:24px;height:24px}.im-playbtn{width:72px;height:72px}.im-controls{gap:20px}.im-close-btn{width:42px;height:42px;border-radius:10px}.im-close-btn svg{width:22px;height:22px}}'+
-'[data-mp="root"].dark [data-mp="toggle"]{background:rgba(65,65,78,.55);border-color:rgba(255,255,255,.08);color:#d0d0d8;box-shadow:0 2px 10px rgba(0,0,0,.2)}'+
-'[data-mp="root"].dark [data-mp="toggle"]:hover{box-shadow:0 4px 16px rgba(0,0,0,.3)}'+
+'[data-mp="root"].dark [data-mp="toggle"]{background:rgba(65,65,78,.55);border-color:rgba(255,255,255,.08);color:#d0d0d8;box-shadow:0 2px 10px rgba(0,0,0,.18)}'+
+'[data-mp="root"].dark [data-mp="toggle"]:hover{border-color:rgba(255,255,255,.2);background:rgba(80,80,95,.62)}'+
 '[data-mp="root"].dark [data-mp="panel"]{background:rgba(55,55,68,.55);border-color:rgba(255,255,255,.06);box-shadow:0 8px 32px rgba(0,0,0,.2)}'+
 '[data-mp="root"].dark .title{color:#d8d8e0}'+
 '[data-mp="root"].dark .artist{color:#999}'+
@@ -210,6 +211,82 @@ MP._css = '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-colo
 '[data-mp="root"].dark .im-lrc-line.active{color:#d0d0d8}'+
 '[data-mp="root"].dark .im-lrc-line.prev{color:rgba(255,255,255,.22)}'+
 '[data-mp="root"].dark [data-mp="lrc"]{color:#d0d0d8!important;background:rgba(55,55,68,.65)!important;border-color:rgba(255,255,255,.06)!important}';
+
+// 容器立体化：面板 / 沉浸式玻璃层 / 封面托板 / 下拉面板
+var B3 = '[data-mp="root"][data-mp="root"] ';
+function b3(list, extra) {
+    return list.split(',').map(function(s){ return B3 + s.trim() + (extra || ''); }).join(',');
+}
+MP._css +=
+'[data-mp="root"]{--s3-top:rgba(255,255,255,.50);--s3-bot:rgba(255,255,255,.30);--s3-bd:rgba(255,255,255,.88);--s3-hi:rgba(255,255,255,.95);--s3-in:rgba(0,0,0,.04);--s3-lo:rgba(0,0,0,.12);--s3-lo2:rgba(0,0,0,.16);--s3-lo3:rgba(0,0,0,.10);--s3-vig:rgba(0,0,0,.07);--s3-sheen:rgba(255,255,255,.16);--s3-shade:rgba(0,0,0,.04)}'+
+'[data-mp="root"].dark{--s3-top:rgba(255,255,255,.10);--s3-bot:rgba(255,255,255,.03);--s3-bd:rgba(255,255,255,.08);--s3-hi:rgba(255,255,255,.10);--s3-in:rgba(0,0,0,.20);--s3-lo:rgba(0,0,0,.35);--s3-lo2:rgba(0,0,0,.40);--s3-lo3:rgba(0,0,0,.28);--s3-vig:rgba(0,0,0,.24);--s3-sheen:rgba(255,255,255,.05);--s3-shade:rgba(0,0,0,.16)}'+
+// ── 容器本体立体化：面板 / 沉浸式玻璃层 / 封面托板 / 下拉面板
+b3('[data-mp="panel"]')+'{background-image:linear-gradient(180deg,var(--s3-top),var(--s3-bot));border-color:var(--s3-bd);box-shadow:inset 0 1px 0 var(--s3-hi),inset 0 -1px 0 var(--s3-in),0 3px 8px var(--s3-lo),0 16px 36px var(--s3-lo2),0 34px 70px var(--s3-lo3)}'+
+// 沉浸式：整屏玻璃层 → 顶部一道光 + 四边轻微暗角，读起来像"浮在页面上的一整块玻璃"
+b3('[data-mp="immersiveOverlay"]')+'{background-image:linear-gradient(180deg,var(--s3-sheen),rgba(255,255,255,0) 45%,var(--s3-shade));border-color:var(--s3-bd);box-shadow:inset 0 1px 0 var(--s3-hi),inset 0 0 130px var(--s3-vig)}'+
+// 封面托板：两层投影 + 顶部玻璃反光
+b3('.im-cover-wrap')+'{box-shadow:0 10px 22px var(--s3-lo2),0 30px 70px var(--s3-lo3),inset 0 1px 0 rgba(255,255,255,.35)}'+
+// 下拉面板（播放模式菜单）：浮层投影
+b3('.mode-menu')+'{background-image:linear-gradient(180deg,var(--s3-top),var(--s3-bot));border-color:var(--s3-bd);box-shadow:inset 0 1px 0 var(--s3-hi),0 4px 10px var(--s3-lo),0 18px 40px var(--s3-lo2)}'+
+// 沉浸式歌单下拉：只加渐变/描边，不动它原有的外投影（移动端是底部抽屉，投影方向朝上）
+b3('.im-slist-dropdown')+'{background-image:linear-gradient(180deg,var(--s3-top),var(--s3-bot));border-color:var(--s3-bd)}';
+
+// 浅色模式按钮配色
+var LB = '[data-mp="root"]:not(.dark) ';
+MP._css +=
+// 静止态
+LB+'.cbtn,'+LB+'.im-btn{background:rgba(96,102,128,.30);border-color:rgba(0,0,0,.14);box-shadow:0 1px 3px rgba(0,0,0,.06);-webkit-backdrop-filter:none;backdrop-filter:none}'+
+LB+'.playbtn,'+LB+'.im-playbtn{background:rgba(96,102,128,.38);border-color:rgba(0,0,0,.16);box-shadow:0 2px 6px rgba(0,0,0,.09);-webkit-backdrop-filter:none;backdrop-filter:none}'+
+LB+'.panel-action-btn,'+LB+'.mode-trigger{background:rgba(96,102,128,.32);border-color:rgba(0,0,0,.14);box-shadow:0 1px 3px rgba(0,0,0,.06)}'+
+LB+'.mvol .b-btn{background:rgba(96,102,128,.30);border-color:rgba(0,0,0,.14);color:#4a4a55}'+
+LB+'.im-close-btn{background:rgba(96,102,128,.30);border-color:rgba(0,0,0,.14)}'+
+LB+'[data-mp="toggle"]{background:rgba(96,102,128,.26);border-color:rgba(0,0,0,.14);box-shadow:0 2px 10px rgba(0,0,0,.10)}'+
+// 悬停态：比静止再深一档（保留原有的缩放反馈）
+LB+'.cbtn:hover,'+LB+'.im-btn:hover{background:rgba(96,102,128,.42);border-color:rgba(0,0,0,.18);transform:scale(1.05)}'+
+LB+'.playbtn:hover,'+LB+'.im-playbtn:hover{background:rgba(96,102,128,.50)}'+
+LB+'.panel-action-btn:hover,'+LB+'.mode-trigger:hover{background:rgba(96,102,128,.44);border-color:rgba(0,0,0,.18)}'+
+LB+'.mvol .b-btn:hover{background:rgba(96,102,128,.40);border-color:rgba(0,0,0,.20);color:#1a1a2e}'+
+LB+'.im-close-btn:hover{background:rgba(96,102,128,.42)}'+
+LB+'[data-mp="toggle"]:hover{background:rgba(96,102,128,.36);border-color:rgba(0,0,0,.20)}'+
+// "增强"已开启的金色状态
+LB+'.mvol .b-btn.on{background:rgba(255,200,50,.22);border-color:rgba(255,180,0,.45);color:#c89600}';
+
+// PC 沉浸式尺寸自适应
+MP._css +=
+'@media(min-width:769px){'+
+// 整屏层滚动与居中
+  '[data-mp="immersiveOverlay"]{padding:52px 0 14px}'+
+  '.im-content{min-height:calc(100vh - 74px);justify-content:center;max-width:min(620px,86vw);gap:clamp(12px,2.2vh,26px)}'+
+  '.im-cover-wrap{width:clamp(180px,28vh,320px);height:clamp(180px,28vh,320px);border-radius:clamp(16px,2.4vh,24px)}'+
+  '.im-title{font-size:clamp(19px,3.2vh,28px)}'+
+  '.im-artist{font-size:clamp(14px,1.9vh,18px);margin-top:clamp(2px,.6vh,6px)}'+
+  '.im-lrc{height:clamp(96px,18vh,160px)}'+
+  '.im-lrc-line{font-size:clamp(13px,1.9vh,15px);padding:clamp(2px,.5vh,4px) 0}'+
+  '.im-lrc-line.active{font-size:clamp(15px,2.2vh,17px)}'+
+  '.im-btn{width:clamp(42px,6.4vh,52px);height:clamp(42px,6.4vh,52px)}'+
+  '.im-btn svg{width:clamp(18px,2.8vh,24px);height:clamp(18px,2.8vh,24px)}'+
+  '.im-playbtn{width:clamp(56px,9.5vh,72px);height:clamp(56px,9.5vh,72px)}'+
+  '.im-close-btn{width:clamp(36px,5vh,42px);height:clamp(36px,5vh,42px);border-radius:clamp(8px,1.4vh,10px)}'+
+  '.im-close-btn svg{width:clamp(16px,2.4vh,22px);height:clamp(16px,2.4vh,22px)}'+
+  '.im-controls{gap:clamp(12px,2.4vh,20px);margin-top:clamp(0px,.8vh,8px)}'+
+  '.im-progress-wrap{gap:clamp(2px,.6vh,4px)}'+
+  '.im-vol-slider input[type=range]{height:clamp(60px,12vh,80px)}'+
+'}'+
+// 极矮窗口（分屏 / 小笔记本）：再压一档，保证播放控件始终在视口内
+'@media(min-width:769px) and (max-height:620px){'+
+  '[data-mp="immersiveOverlay"]{padding:44px 0 12px}'+
+  '.im-content{min-height:calc(100vh - 60px);gap:clamp(10px,2vh,18px);padding:0 20px}'+
+  '.im-cover-wrap{width:clamp(140px,26vh,200px);height:clamp(140px,26vh,200px)}'+
+  '.im-title{font-size:clamp(17px,3vh,22px)}'+
+  '.im-lrc{height:clamp(64px,15vh,110px);margin:0}'+
+  '.im-progress-wrap{margin-top:0}'+
+'}'+
+// 更极端（<480px 高）：封面再小、隐藏歌手行，优先保控件
+'@media(min-width:769px) and (max-height:480px){'+
+  '.im-cover-wrap{width:clamp(110px,24vh,150px);height:clamp(110px,24vh,150px)}'+
+  '.im-lrc{height:clamp(48px,13vh,80px)}'+
+  '.im-artist{display:none}'+
+'}';
 
     MP.loadCSS = function(cb) { cb(); };
 

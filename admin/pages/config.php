@@ -68,6 +68,25 @@ if (!empty($keys)) {
       <input type="checkbox" name="autoplay_default" value="1"<?= $autoplayDefault ? ' checked' : '' ?>>
       自动播放
     </label>
+    <div style="padding:10px 0 12px;font-size:13px;color:rgba(0,0,0,.5)">
+      <div style="margin-bottom:8px;font-weight:600">播放器初始位置（访客首次打开时出现的位置）</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <label class="form-radio">
+          <input type="radio" name="player_pos_side" value="right"<?= $playerPosSide === 'right' ? ' checked' : '' ?>>
+          靠右
+        </label>
+        <label class="form-radio">
+          <input type="radio" name="player_pos_side" value="left"<?= $playerPosSide === 'left' ? ' checked' : '' ?>>
+          靠左
+        </label>
+        <label style="display:flex;align-items:center;gap:6px">
+          垂直位置
+          <input type="number" name="player_pos_y" min="5" max="95" step="1" value="<?= (int)$playerPosY ?>" style="width:70px;padding:4px 6px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.6)">
+          <span>%（0=最上，100=最下；默认 88）</span>
+        </label>
+      </div>
+      <div style="margin-top:6px;font-size:12px;color:rgba(0,0,0,.35)">访客自己拖动过播放器后以他的位置为准；保存这里会清掉你自己浏览器里的位置记忆，方便立刻预览。</div>
+    </div>
     <button class="btn btn-primary btn-block" style="margin-top:8px">保存</button>
   </form>
 </div>
@@ -91,20 +110,25 @@ if (!empty($keys)) {
       </div>
     </div>
 
-    <div class="playlist-grid">
+    <div class="playlist-grid" data-key-id="<?= $kid ?>">
       <?php
-      $_plCoverCache = cover_cache_read($_plCoverFile);
-      $_currentUsername = $_SESSION['admin_user'] ?? 'unknown';
-      $_userPlCache = $_plCoverCache[$_currentUsername] ?? [];
+      // 封面统一存在数据库（mapi_playlists.cover_data），这里一次性把这批歌单的封面取出来
+      $_plCoverRows = [];
+      if (!empty($myPlaylists)) {
+          $_ids = [];
+          foreach ($myPlaylists as $_p) $_ids[] = (int)$_p['id'];
+          if ($_ids) {
+              $_cr = $db->query('SELECT id, cover_url, cover_data FROM mapi_playlists WHERE id IN (' . implode(',', $_ids) . ')');
+              if ($_cr) while ($_crow = $_cr->fetch_assoc()) $_plCoverRows[(int)$_crow['id']] = $_crow;
+          }
+      }
       foreach ($myPlaylists as $pl):
         $plId = (int)$pl['id'];
         $plSongs = $songsByPl[$plId] ?? [];
         $songCount = count($plSongs);
-        $coverSrc = $pl['cover_url'] ?: '';
-        $coverB64 = $_userPlCache[(string)$plId] ?? '';
-        if ($coverB64) {
-            $coverSrc = $coverB64;
-        } elseif ($coverSrc && !preg_match('/^https?:\/\//', $coverSrc)) {
+        $coverB64 = $_plCoverRows[$plId]['cover_data'] ?? '';
+        $coverSrc = $coverB64 ?: (string)($_plCoverRows[$plId]['cover_url'] ?? $pl['cover_url'] ?: '');
+        if (!$coverB64 && $coverSrc && !preg_match('/^https?:\/\//', $coverSrc)) {
             $ab = $cfg['api']['base_url'] ?? '';
             $rs = $cfg['api']['param_server'] ?? 'server';
             $rt = $cfg['api']['param_type'] ?? 'type';
@@ -120,7 +144,7 @@ if (!empty($keys)) {
       <?php if ($isRemote): ?>
       <div class="playlist-card playlist-card-remote" data-pl-id="<?= $plId ?>" data-pl-name="<?= htmlspecialchars($pl['name']) ?>" data-remote-id="<?= htmlspecialchars($pl['remote_id']) ?>" data-server="<?= htmlspecialchars($pl['server']) ?>" data-cover-mode="<?= htmlspecialchars($pl['cover_mode']) ?>">
       <?php else: ?>
-      <a href="?action=playlist-detail&id=<?= $plId ?>" class="playlist-card">
+      <a href="?action=playlist-detail&id=<?= $plId ?>" class="playlist-card" data-pl-id="<?= $plId ?>" draggable="false">
       <?php endif; ?>
         <div class="playlist-card-cover">
           <?php if ($coverSrc): ?>
@@ -161,7 +185,7 @@ if (!empty($keys)) {
       <span class="song-modal-title">添加歌单</span>
       <button type="button" class="song-modal-close">✕</button>
     </div>
-    <div style="padding:16px 20px">
+    <div class="song-modal-body">
       <div class="create-type-row">
         <label class="create-type-opt">
           <input type="radio" name="create_type" value="custom" checked>
@@ -221,7 +245,7 @@ if (!empty($keys)) {
       <span class="song-modal-title">编辑远程歌单</span>
       <button type="button" class="song-modal-close">✕</button>
     </div>
-    <div style="padding:16px 20px">
+    <div class="song-modal-body">
       <input type="hidden" id="editPlId">
       <label class="create-field-label">歌单名称</label>
       <input type="text" id="editName" class="form-input" style="margin-bottom:12px">

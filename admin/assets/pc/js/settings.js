@@ -35,7 +35,7 @@ function openMailTemplateModal(id){
 
 function closeMailTemplateModal(){document.getElementById('mailTemplateModal').style.display='none'}
 
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){var m=document.getElementById('mailTemplateModal');if(m&&m.style.display==='flex')closeMailTemplateModal()}})
+if(!window.__mailEscBound){window.__mailEscBound=1;document.addEventListener('keydown',function(e){if(e.key==='Escape'){var m=document.getElementById('mailTemplateModal');if(m&&m.style.display==='flex')closeMailTemplateModal()}});}
 
 function handleMailTemplateSubmit(e){
   e.preventDefault();e.stopPropagation();

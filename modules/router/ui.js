@@ -15,14 +15,24 @@
         tog.style.transform = 'translateX(' + (dir * 70) + '%)';
     };
 
-    MP._scheduleAutoHide = function() {
+    // 悬浮按钮的自动收起 (吸附进侧边) : 平时移开鼠标 3 秒收起;
+    MP._autoHideDelay = 3000;
+    MP._postLoadHideDelay = (typeof window.__mapiToggleHideDelay === 'number' && window.__mapiToggleHideDelay >= 0)
+        ? window.__mapiToggleHideDelay : 10000;
+
+    MP._scheduleAutoHide = function(delayMs) {
         clearTimeout(MP._retractTimer);
         MP._retracted = false;
         MP._updateToggleTransform();
+        var wait = (typeof delayMs === 'number') ? delayMs : MP._autoHideDelay;
         MP._retractTimer = setTimeout(function() {
+            if (MP._loading) {                       // 加载中不收起（呼吸动效期间保持完整可见）
+                MP._scheduleAutoHide(MP._autoHideDelay);
+                return;
+            }
             MP._retracted = true;
             MP._updateToggleTransform();
-        }, 3000);
+        }, wait);
     };
 
     MP._cancelAutoHide = function() {
@@ -70,7 +80,12 @@
         else { cover.style.display = 'none'; }
         var togCover = MP.$('toggleCover');
         var togSvg = MP.$('toggleSvg');
-        if (togCover && info && info.cover) {
+        if (MP._loading) {
+            // 加载完成前：悬浮按钮只显示音符 + 呼吸动效，不显示“播放中”封面
+            if (togCover) { togCover.style.display = 'none'; togCover.src = ''; }
+            if (togSvg) togSvg.style.display = '';
+            MP._lastToggleCover = '';
+        } else if (togCover && info && info.cover) {
             if (info.cover !== MP._lastToggleCover) {
                 MP._lastToggleCover = info.cover;
                 togCover.style.display = 'block';
@@ -117,7 +132,12 @@
                     html += '<span class="pl-cover" style="display:flex;align-items:center;justify-content:center;font-size:10px">' + _.escapeHtml(name.charAt(0)) + '</span>';
                 }
                 html += '<span class="pl-name">' + _.escapeHtml(name) + '</span>';
-                html += '<span class="pl-count">' + (MP._allSongs[i] ? MP._allSongs[i].length : 0) + '\u9996</span>';
+                var cnt;
+                if (MP._loadFailed[i]) cnt = '\u5931\u8d25';
+                else if (MP._allSongs[i]) cnt = MP._allSongs[i].length + '\u9996';
+                else if (MP._loadingPlaylists[i] || MP._preloadIdx === i) cnt = '\u52a0\u8f7d\u4e2d';
+                else cnt = '\u5f85\u52a0\u8f7d';
+                html += '<span class="pl-count">' + cnt + '</span>';
                 html += '</div>';
             }
             innerEls.forEach(function(el){
@@ -126,14 +146,54 @@
                     item.addEventListener('click', function(e){
                         e.stopPropagation();
                         var plidx = parseInt(this.getAttribute('data-plidx'));
-                        MP._viewingPlaylist = false;
-                        MP._viewingPlaylistIndex = plidx;
-                        MP._renderWithFade();
+                        var showSongs = function(){
+                            if (MP._destroyed) return;
+                            MP._viewingPlaylist = false;
+                            MP._viewingPlaylistIndex = plidx;
+                            if (!MP.ap) {
+                                var list = MP._allSongs[plidx] || [];
+                                if (list.length) {
+                                    MP.currentPlaylistIndex = plidx;
+                                    MP.songs = list;
+                                    MP.initPlayer(list);
+                                    return;
+                                }
+                            }
+                            MP._renderWithFade();
+                        };
+                        if (MP._allSongs[plidx] && !MP._loadFailed[plidx]) {
+                            showSongs();
+                        } else {
+                            // 该歌单尚未加载：先给出“加载中”反馈，再按需拉取
+                            MP._renderWithFade();
+                            MP.ensurePlaylistLoaded(plidx, showSongs);
+                        }
                     });
                 });
             });
         } else {
-            var viewSongs = MP._allSongs[MP._viewingPlaylistIndex] || [];
+            var viewIdx = MP._viewingPlaylistIndex;
+            var viewSongs = MP._allSongs[viewIdx] || [];
+            if (viewSongs.length === 0 && !MP._allSongs[viewIdx] && !MP._loadFailed[viewIdx]) {
+                // 歌单尚未加载过：显示加载态并自动拉取
+                innerEls.forEach(function(el){
+                    el.innerHTML = '<div style="color:#999;font-size:13px;text-align:center;padding:20px 0">\u52a0\u8f7d\u4e2d\u2026</div>';
+                });
+                MP.ensurePlaylistLoaded(viewIdx, function(){ if (!MP._destroyed) MP.renderSonglist(); });
+                return;
+            }
+            if (viewSongs.length === 0 && MP._loadFailed[viewIdx]) {
+                // 上次加载失败：给出可点击的重试入口，而不是误报“无歌曲”
+                innerEls.forEach(function(el){
+                    el.innerHTML = '<div class="pl-retry" style="color:#999;font-size:13px;text-align:center;padding:20px 0;cursor:pointer">\u52a0\u8f7d\u5931\u8d25\uff0c\u70b9\u51fb\u91cd\u8bd5</div>';
+                    var retryEl = el.querySelector('.pl-retry');
+                    if (retryEl) retryEl.addEventListener('click', function(e){
+                        e.stopPropagation();
+                        MP.ensurePlaylistLoaded(viewIdx, function(){ if (!MP._destroyed) MP.renderSonglist(); });
+                    });
+                });
+                return;
+            }
             if (viewSongs.length === 0) {
                 innerEls.forEach(function(el){
                     el.innerHTML = '<div style="color:#999;font-size:13px;text-align:center;padding:20px 0">\u65e0\u6b4c\u66f2</div>';
@@ -223,9 +283,10 @@
 
     MP.togglePanel = function() {
         if (MP._loading) {
+            // 设计如此：歌单没有全部加载完成前不打开面板，悬浮按钮的呼吸动效就是加载提示
             if (MP._toastEl && MP._toastEl.parentNode) return;
             var toast = document.createElement('div');
-            toast.textContent = '\u52a0\u8f7d\u4e2d\u2026';
+            toast.textContent = '\u6b63\u5728\u52a0\u8f7d\u2026';
             toast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%) scale(0.8);z-index:2147483647;background:rgba(0,0,0,.55);backdrop-filter:blur(16px)saturate(200%);color:#fff;font-size:14px;font-weight:600;padding:10px 20px;border-radius:10px;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);pointer-events:none';
             document.body.appendChild(toast);
             MP._toastEl = toast;

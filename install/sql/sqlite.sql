@@ -1,3 +1,5 @@
+-- 参考文件：SQLite 结构由 install/sql/mysql.sql 派生，本文件不参与建表
+
 -- mapi_users
 CREATE TABLE IF NOT EXISTS mapi_users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8,8 +10,10 @@ CREATE TABLE IF NOT EXISTS mapi_users (
     is_admin INTEGER DEFAULT 0,
     auto_theme INTEGER DEFAULT 1,
     theme_mode VARCHAR(10) DEFAULT 'light',
+    admin_theme VARCHAR(10) DEFAULT 'light',
     lyrics_default INTEGER DEFAULT 1,
     autoplay_default INTEGER DEFAULT 0,
+    player_pos VARCHAR(24) DEFAULT '',
     background VARCHAR(500) DEFAULT '',
     background_url VARCHAR(500) DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -125,10 +129,22 @@ CREATE TABLE IF NOT EXISTS mapi_playlists (
     remote_id VARCHAR(100) DEFAULT '',
     server VARCHAR(20) DEFAULT 'netease',
     cover_url VARCHAR(500) DEFAULT '',
+    cover_data TEXT,
     cover_mode VARCHAR(20) DEFAULT 'auto',
     sort_order INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    cover_updated_at DATETIME DEFAULT NULL
 );
+
+CREATE TABLE IF NOT EXISTS mapi_song_covers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    song_ref VARCHAR(191) NOT NULL DEFAULT '',
+    key_id INTEGER NOT NULL DEFAULT 0,
+    cover_url VARCHAR(500) DEFAULT '',
+    cover_data TEXT,
+    updated_at DATETIME DEFAULT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_song_covers_ref ON mapi_song_covers (song_ref);
 
 CREATE TABLE IF NOT EXISTS mapi_songs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,5 +155,20 @@ CREATE TABLE IF NOT EXISTS mapi_songs (
     artist VARCHAR(255) DEFAULT '',
     server VARCHAR(20) DEFAULT 'netease',
     sort_order INTEGER DEFAULT 0,
+    missing INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ═══ 索引（与 MySQL 版保持一致；增量升级会按 install/lib/migrations.php 的声明自动补齐）═══
+CREATE INDEX IF NOT EXISTS idx_keys_user_id          ON mapi_keys (user_id);
+CREATE INDEX IF NOT EXISTS idx_keys_api_key          ON mapi_keys (api_key);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id        ON mapi_orders (user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_trade_no       ON mapi_orders (trade_no);
+CREATE INDEX IF NOT EXISTS idx_passkeys_user_id      ON mapi_passkeys (user_id);
+CREATE INDEX IF NOT EXISTS idx_passkeys_credential   ON mapi_passkeys (credential_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_expires_at     ON mapi_tokens (expires_at);
+CREATE INDEX IF NOT EXISTS idx_logs_api_key          ON mapi_logs (api_key);
+CREATE INDEX IF NOT EXISTS idx_logs_created_at       ON mapi_logs (created_at);
+CREATE INDEX IF NOT EXISTS idx_playlists_key_id      ON mapi_playlists (key_id);
+CREATE INDEX IF NOT EXISTS idx_songs_playlist_id     ON mapi_songs (playlist_id);
+CREATE INDEX IF NOT EXISTS idx_songs_key_id          ON mapi_songs (key_id);

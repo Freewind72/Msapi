@@ -1,4 +1,3 @@
-/* settings.js — 设置页面脚本（移动端） */
 (function(){var m=document.getElementById('mailTemplateModal');if(m&&m.parentElement!==document.body){var s=document.body.querySelector('#mailTemplateModal');if(s)s.remove();document.body.appendChild(m)}})()
 
 function openMailTemplateModal(id){
@@ -36,7 +35,7 @@ function openMailTemplateModal(id){
 
 function closeMailTemplateModal(){document.getElementById('mailTemplateModal').style.display='none'}
 
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){var m=document.getElementById('mailTemplateModal');if(m&&m.style.display==='flex')closeMailTemplateModal()}})
+if(!window.__mailEscBound){window.__mailEscBound=1;document.addEventListener('keydown',function(e){if(e.key==='Escape'){var m=document.getElementById('mailTemplateModal');if(m&&m.style.display==='flex')closeMailTemplateModal()}});}
 
 function handleMailTemplateSubmit(e){
   e.preventDefault();e.stopPropagation();
@@ -136,21 +135,24 @@ function setDefaultTemplate(id){
           var defBadge=item.querySelector('.tpl-badge-def');if(defBadge)defBadge.remove();
           var act=item.querySelector('.tpl-item-actions');
           if(act){
-            var btns=act.querySelectorAll('button');
-            for(var j=btns.length-1;j>=0;j--){
-              if(btns[j].textContent.indexOf('设默认')!==-1)btns[j].remove()
-            }
-            if(parseInt(item.id.replace('tplItem',''))===id){
-              var isHtml=item.getAttribute('data-html')==='1';
-              item.classList.add('tpl-item-default');
-              var top=item.querySelector('.tpl-item-top');
-              if(top){
-                var fmtBadge=top.querySelector('.tpl-badge-fmt');
-                var defSpan=document.createElement('span');
-                defSpan.className='tpl-badge-def';defSpan.textContent='默认';
-                if(fmtBadge)fmtBadge.parentNode.insertBefore(defSpan,fmtBadge.nextSibling)
+            var setBtn=act.querySelector('button:nth-child(2)');
+            if(setBtn&&setBtn.textContent.includes('设默认'))setBtn.remove();
+            var editBtn=act.querySelector('button:nth-child(1)');
+            if(editBtn){
+              var itemId=parseInt(item.id.replace('tplItem',''));
+              if(itemId===id){
+                editBtn.insertAdjacentHTML('afterend','<button class="btn btn-sm btn-outline" onclick="setDefaultTemplate('+itemId+')">设默认</button>')
               }
             }
+          }
+        }
+        var target=document.getElementById('tplItem'+id);if(target){
+          target.classList.add('tpl-item-default');
+          var top=target.querySelector('.tpl-item-top');if(top){
+            var fmt=top.querySelector('.tpl-badge-fmt');if(fmt)fmt.insertAdjacentHTML('afterend','<span class="tpl-badge-def">默认</span>')
+          }
+          var act=target.querySelector('.tpl-item-actions');if(act){
+            var setBtn=act.querySelector('button:nth-child(2)');if(setBtn&&setBtn.textContent.includes('设默认'))setBtn.remove()
           }
         }
       }else{if(typeof showToast==='function')showToast('设置失败','err')}

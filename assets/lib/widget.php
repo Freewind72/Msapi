@@ -10,6 +10,8 @@ if ($embedJs && $embedJs[0] === '/') {
 <script>
 (function(){
     var E=<?= json_encode($embedJs) ?>;
+    // 后台预加载并发：多进程服务器（Nginx/Apache + PHP-FPM）用 3，单线程 php -S 用 1（否则切页会被排队拖慢）
+    window.__mapiPrefetchConcurrency=<?= (strpos((string)($_SERVER['SERVER_SOFTWARE'] ?? ''), 'Development Server') !== false) ? 1 : 3 ?>;
     function readCookie(n){try{var m=document.cookie.match('(^| )'+n+'=([^;]+)');return m?decodeURIComponent(m[2]):''}catch(e){return''}}
     function loadPlayer(btn){
         var s=document.createElement('script');
