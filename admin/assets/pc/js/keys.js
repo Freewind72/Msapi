@@ -59,8 +59,8 @@ function loadTestPlayer(apiKey){
   window.__mapiPlayerRequested=apiKey;      // 先记录“已请求”，按钮即刻显示“卸载”（不依赖脚本是否已执行）
   var s=document.createElement('script');
   s.id='testPlayerScript';
-  s.src=window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/modules/api.php?route=router');
-  s.setAttribute('key',apiKey);
+  s.src=window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/api.php')+'?key='+encodeURIComponent(apiKey);
+  s.setAttribute('key',apiKey);             // 转发壳仍会读它；新入口以 URL 参数为准
   document.body.appendChild(s);
   if(!document.getElementById('testPlayerStyles')){
     var st=document.createElement('style');

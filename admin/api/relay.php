@@ -36,7 +36,7 @@ $RELAY = [
         'codemirror'       => '/admin/assets/codemirror',
         'front_css'        => '/assets/css',
         'front_js'         => '/assets/js',
-        'embed_js'         => '/modules/api.php?route=router',
+        'embed_js'         => '/api.php',
         'widget_php'       => '/assets/lib/widget.php',
         'jwt_php'          => '/assets/lib/jwt.php',
     ],

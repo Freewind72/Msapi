@@ -2,6 +2,26 @@
     if (!MP) return;
     var _ = MP._;
 
+    // 沉浸模式要临时锁住宿主页滚动；退出时必须还原宿主原本的值。
+    // 一律清成 '' 会抹掉主题写在 body / documentElement 上的内联 overflow。
+    var _prevOverflow = null;
+    function _lockHostScroll() {
+        if (_prevOverflow === null) {
+            _prevOverflow = {
+                body: document.body.style.overflow,
+                html: document.documentElement.style.overflow
+            };
+        }
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+    }
+    function _restoreHostScroll() {
+        if (_prevOverflow === null) return;
+        document.body.style.overflow = _prevOverflow.body;
+        document.documentElement.style.overflow = _prevOverflow.html;
+        _prevOverflow = null;
+    }
+
     MP.toggleImmersive = function() {
         var ov = MP.$('immersiveOverlay');
         var tog = MP.$('toggle');
@@ -15,8 +35,7 @@
         if (MP._imOpen) {
             ov.classList.add('open');
             if (tog) { tog.style.opacity = '0'; tog.style.pointerEvents = 'none'; }
-            document.body.style.overflow = 'hidden';
-            document.documentElement.style.overflow = 'hidden';
+            _lockHostScroll();
             if (!ov._touchHandler) {
                 ov._touchHandler = function(e){
                     var t = e.target;
@@ -36,8 +55,7 @@
         } else {
             ov.classList.remove('open');
             if (tog) { tog.style.opacity = ''; tog.style.pointerEvents = ''; }
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
+            _restoreHostScroll();
             if (ov._touchHandler) {
                 ov.removeEventListener('touchmove', ov._touchHandler);
                 ov._touchHandler = null;
@@ -61,8 +79,7 @@
         if (tog) { tog.style.opacity = ''; tog.style.pointerEvents = ''; }
         var lrcPill = document.querySelector('[data-mp="lrc"]');
         if (lrcPill) lrcPill.style.display = '';
-        document.body.style.overflow = '';
-        document.documentElement.style.overflow = '';
+        _restoreHostScroll();
         if (ov._touchHandler) {
             ov.removeEventListener('touchmove', ov._touchHandler);
             ov._touchHandler = null;

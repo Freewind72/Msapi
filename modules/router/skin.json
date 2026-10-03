@@ -1,0 +1,9 @@
+{
+  "name": "router",
+  "displayName": "悬浮玻璃",
+  "description": "悬浮圆钮 + 展开式玻璃面板；可拖拽、边缘吸附、顶部停靠，带沉浸全屏模式",
+  "version": "2.0.0",
+  "apiVersion": 1,
+  "mode": "modules",
+  "modules": ["widget.js", "drag.js", "immersive.js"]
+}

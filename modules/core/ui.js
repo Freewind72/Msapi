@@ -11,8 +11,14 @@
         var tog = MP.$('toggle');
         if (!tog) return;
         if (!MP._retracted) { tog.style.transform = ''; return; }
+        // 收起时按像素推，而不是按自身宽度的百分比：
+        // 静止状态按钮距墙 mr，再往墙里推 (mr + 半个身位) → 屏幕外正好藏住一半（2/4），
+        // 旧版写死 translateX(70%) 只藏了 2/5，且边距一变露出的比例还会跟着变。
+        var w = tog.offsetWidth || 48;
+        var mr = window.innerWidth <= 768 ? 4 : 15;
+        var shift = mr + w / 2;
         var dir = MP._side === 'left' ? -1 : 1;
-        tog.style.transform = 'translateX(' + (dir * 70) + '%)';
+        tog.style.transform = 'translateX(' + (dir * shift) + 'px)';
     };
 
     // 悬浮按钮的自动收起 (吸附进侧边) : 平时移开鼠标 3 秒收起;
@@ -307,20 +313,14 @@
             MP._cancelAutoHide();
             pnl.classList.add('open');
             MP.updateUI();
-            var pr = pnl.getBoundingClientRect();
-            if (pr.top < 0) {
-                var h = MP._hostRoot.host;
-                var hr = h.getBoundingClientRect();
-                var offset = Math.abs(pr.top) + 8;
-                h.style.transition = 'top .35s cubic-bezier(.34,1.56,.64,1), left .35s cubic-bezier(.34,1.56,.64,1)';
-                h.style.top = (hr.top + offset) + 'px';
-                h.style.bottom = 'auto';
-                clearTimeout(MP._autoCalibrateTmr);
-                MP._autoCalibrateTmr = setTimeout(function(){ h.style.transition = 'none'; }, 400);
-            }
+            // 展开后按「面板 ∪ 按钮」的实际可见范围统一夹进视口。
+            // 顶部停靠时面板是向下浮出的，本来就不会顶出屏幕；其余情况才需要临时下移。
+            if (typeof MP._snap === 'function') MP._snap();
         } else {
             pnl.classList.remove('open');
             MP._scheduleAutoHide();
+            // 收起后可见范围缩回按钮本身：让它回到访客拖到的位置（临时夹取不落盘）
+            if (typeof MP._snap === 'function') MP._snap();
         }
     };
 

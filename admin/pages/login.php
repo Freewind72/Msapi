@@ -366,6 +366,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'login') {
                 $_SESSION['admin_lyrics_default'] = (int)($row['lyrics_default'] ?? 1);
                 $_SESSION['admin_autoplay_default'] = (int)($row['autoplay_default'] ?? 0);
                 $_SESSION['admin_player_pos'] = trim((string)($row['player_pos'] ?? ''));
+                // 皮肤属于「用户设置」，登录时必须一并读回会话 —— 否则登录后配置页显示默认值，
+                // 此时一按保存就会把默认值写回数据库（配置真被覆盖）。列可能不存在，用 ?? 兜底。
+                $_SESSION['admin_player_skin'] = trim((string)($row['player_skin'] ?? ''));
+                $_SESSION['admin_player_skin_cfg'] = trim((string)($row['player_skin_cfg'] ?? ''));
                 $_SESSION['admin_background'] = $row['background'] ?? '';
                 $_SESSION['admin_background_url'] = $row['background_url'] ?? '';
                 header('Location: ?action=dashboard'); exit;
@@ -475,6 +479,10 @@ if ($action === 'pk-login-complete') {
     $_SESSION['admin_lyrics_default'] = (int)($row['lyrics_default'] ?? 1);
     $_SESSION['admin_autoplay_default'] = (int)($row['autoplay_default'] ?? 0);
                 $_SESSION['admin_player_pos'] = trim((string)($row['player_pos'] ?? ''));
+                // 皮肤属于「用户设置」，登录时必须一并读回会话 —— 否则登录后配置页显示默认值，
+                // 此时一按保存就会把默认值写回数据库（配置真被覆盖）。列可能不存在，用 ?? 兜底。
+                $_SESSION['admin_player_skin'] = trim((string)($row['player_skin'] ?? ''));
+                $_SESSION['admin_player_skin_cfg'] = trim((string)($row['player_skin_cfg'] ?? ''));
     $_SESSION['admin_background'] = $row['background'] ?? '';
     $_SESSION['admin_background_url'] = $row['background_url'] ?? '';
     unset($_SESSION['pk_challenge'], $_SESSION['pk_rp_id'], $_SESSION['pk_origin']);

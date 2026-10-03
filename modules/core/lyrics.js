@@ -80,10 +80,16 @@
         if (MP.ap && !MP.ap.audio.paused) {
             if (!hasLrc && txt === '') { txt = PLACEHOLDER; }
             if (txt) {
-                span.textContent = txt;
+                // 只有【真的换行】才重排跑马灯。
+                // 这个函数挂在 timeupdate 上（约 4 次/秒），以前每次都把 transform 归零、
+                // 再重启 transition —— 等于每秒把文字拽回起点 4 次，移动端看着就是来回抽搐。
+                var lineChanged = (txt !== MP._lrcTxt);
+                if (lineChanged) { MP._lrcTxt = txt; span.textContent = txt; }
                 if (!MP._showLrc || MP._lrcAnimating) return;
                 lrcEl.style.opacity = '1';
+                if (!lineChanged) return;          // 文本没变：什么都不做，让动画安静地跑完
 
+                MP._lrcRestartCount = (MP._lrcRestartCount || 0) + 1;   // 诊断：真正触发的重排次数
                 var newW = span.scrollWidth + 42;
                 if (isMobile) newW = Math.min(newW, window.innerWidth - 32);
                 var oldW = MP._lastLrcW || newW;
@@ -100,15 +106,9 @@
                     var boxW = newW - 42;
                     if (span.scrollWidth > boxW) {
                         var overflow = span.scrollWidth - boxW;
-                        var dur = 5;
-                        if (hasLrc) {
-                            for (var j = 0; j < MP.lrcLines.length; j++) {
-                                if (MP.lrcLines[j].time > ct) {
-                                    dur = Math.min(Math.max(MP.lrcLines[j].time - ct, 2), 10);
-                                    break;
-                                }
-                            }
-                        }
+                        // 匀速滚动：按固定速度算时长，不再用「本行剩余时间」——
+                        // 那会让每行速度快慢不一，看着忽快忽慢。
+                        var dur = Math.min(30, Math.max(4, Math.round(overflow / 28)));
                         requestAnimationFrame(function(){
                             span.style.transition = 'transform ' + dur + 's linear';
                             span.style.transform = 'translateX(-' + overflow + 'px)';

@@ -59,7 +59,7 @@ function mapi_users_select_cols($db): string {
     $base = ['id', 'username', 'password', 'qq', 'email', 'is_admin'];
     $want = array_merge($base, [
         'auto_theme', 'theme_mode', 'lyrics_default', 'autoplay_default',
-        'player_pos', 'background', 'background_url', 'admin_theme',
+        'player_pos', 'player_skin', 'player_skin_cfg', 'background', 'background_url', 'admin_theme',
     ]);
     $have = mapi_users_columns($db);
     if (!$have) return implode(',', $base);

@@ -172,7 +172,7 @@ if ($superToken) {
       <div class="terminal-line"><span class="ln">2</span><code id="embedCodeLine"></code></div>
       <div class="terminal-line"><span class="ln">3</span><span class="comment">播放器自动悬浮右下角，所有访客即刻收听</span></div>
     </div>
-    <script>(function(){var el=document.getElementById('embedCodeLine'),src=location.origin+'<?= $RELAY["asset"]["embed_js"] ?>';el.innerHTML='<span class="hl-tag">&lt;script</span> <span class="hl-attr">src</span>=<span class="hl-str">\"'+src+'\"</span> <span class="hl-attr">key</span>=<span class="hl-str">\"your_key\"</span><span class="hl-tag">&gt;&lt;/script&gt;</span>';})();</script>
+    <script>(function(){var el=document.getElementById('embedCodeLine'),src=location.origin+'<?= $RELAY["asset"]["embed_js"] ?>'+'?key=your_key';el.innerHTML='<span class="hl-tag">&lt;script</span> <span class="hl-attr">src</span>=<span class="hl-str">\"'+src+'\"</span> <span class="hl-attr">defer</span><span class="hl-tag">&gt;&lt;/script&gt;</span>';})();</script>
   </div>
 </section>
 

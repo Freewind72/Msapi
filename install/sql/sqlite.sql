@@ -1,4 +1,4 @@
--- 参考文件：SQLite 结构由 install/sql/mysql.sql 派生，本文件不参与建表
+﻿-- 参考文件：SQLite 结构由 install/sql/mysql.sql 派生，本文件不参与建表
 
 -- mapi_users
 CREATE TABLE IF NOT EXISTS mapi_users (
@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS mapi_users (
     lyrics_default INTEGER DEFAULT 1,
     autoplay_default INTEGER DEFAULT 0,
     player_pos VARCHAR(24) DEFAULT '',
+    player_skin VARCHAR(32) DEFAULT '',
+    player_skin_cfg VARCHAR(1000) DEFAULT '{"rose":{"pos":"left:88"},"router":{"pos":"right:80"}}',
     background VARCHAR(500) DEFAULT '',
     background_url VARCHAR(500) DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

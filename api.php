@@ -1,5 +1,11 @@
 <?php
-// modules/api.php — 路由分发器 / 播放器模块输出
+// api.php — 播放器总入口（项目根目录）
+//
+//   GET /api.php?key=密钥[&route=皮肤]       → 启动脚本（key → 用户 → 皮肤）
+//   GET /api.php?skin=皮肤&asset=文件名.js   → 模块文件（静态输出 + ETag，不查库）
+//
+// 兼容：旧写法（把密钥写在 <script key="..."> 属性上）已停用 —— 服务端读不到标签属性，
+// 必须用 ?key= 查询参数。旧入口 modules/api.php 已删除。
 header('Content-Type: application/javascript; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
@@ -33,34 +39,102 @@ function msapi_send_error(string $msg, int $code = 404): void {
     exit;
 }
 
-$route = $_GET['route'] ?? '';
-$routes = [
-    'router'       => 'modules/router/',
-    'chiropractic' => 'modules/chiropractic/',
-];
+require_once __DIR__ . '/modules/registry.php';
 
-if (!isset($routes[$route])) {
-    msapi_send_error('Unknown route: ' . (string)$route, 400);
+/**
+ * 密钥 → 皮肤：key → mapi_keys.user_id → mapi_users.player_skin
+ *
+ * 只在这里查库（api_key 上有索引，一次查询），且只在「没写 route」时才走到。
+ * 模块文件请求走 ?skin=&asset=、不带 key，所以一次页面加载最多一次查询。
+ * 任何异常都返回 null（fail-open），由调用方回落默认皮肤 —— 数据库抖动不该让嵌入站白屏。
+ */
+function msapi_skin_for_key(string $key): ?string {
+    if ($key === '' || !preg_match('/^[A-Za-z0-9]{8,64}$/', $key)) return null;
+
+    // 这里吐出的任何字节都会混进启动 JS 里 —— 一句 PHP 警告就足以让整段脚本语法报废、
+    // 播放器彻底不启动。所以整个查库过程兜在输出缓冲里，并把 display_errors 关掉。
+    $obLevel = ob_get_level();
+    $prevDisplay = ini_get('display_errors');
+    ob_start();
+    ini_set('display_errors', '0');
+
+    try {
+        global $CFG;                      // db_connect() 里用的是 global $CFG，必须写在全局
+        $cfgFile = __DIR__ . '/config/config.php';
+        if (!is_file($cfgFile)) return null;
+        $CFG = require $cfgFile;
+        if (!is_array($CFG)) return null;
+        require_once __DIR__ . '/assets/lib/db.php';
+        $db = db_connect();
+        if (!$db) return null;
+        $stmt = $db->prepare('SELECT u.player_skin FROM mapi_keys k JOIN mapi_users u ON u.id = k.user_id WHERE k.api_key = ? AND k.status = 1 LIMIT 1');
+        if (!$stmt) return null;
+        $stmt->bind_param('s', $key);
+        if (!$stmt->execute()) return null;
+        $res = $stmt->get_result();
+        $row = $res ? $res->fetch_assoc() : null;
+        $skin = trim((string)($row['player_skin'] ?? ''));
+        return $skin !== '' ? $skin : null;
+    } catch (Throwable $e) {
+        error_log('[msapi] skin lookup failed: ' . $e->getMessage());
+        return null;
+    } finally {
+        ini_set('display_errors', $prevDisplay === false ? '0' : $prevDisplay);
+        while (ob_get_level() > $obLevel) { ob_end_clean(); }
+    }
 }
 
-$MODULE_DIR = $routes[$route];
+// ═══ 皮肤清单 ═══
+// 一个皮肤 = modules/<skin>/ 下的皮肤层（DOM + 样式 + 交互），由 skin.json 声明；
+// 引擎（鉴权 / 状态 / 音频内核 / 歌词 / 主题）全站只有一份，见 modules/core/core.json。
+// 清单不再硬编码在本文件里 —— 后台皮肤选择器读的是同一份清单。
+// ═══ 皮肤解析 ═══
+// 模块文件请求：皮肤由 ?skin= 带过来（bootstrap 解析一次后写进 URL），不查库；
+//                同时兼容旧的 ?route=。
+// 启动脚本：显式 route 优先 → 否则按 key 解析（key → 用户 → player_skin）→ 否则默认皮肤。
+$API_KEY   = trim((string)($_GET['key'] ?? ''));
+$skinParam = (string)($_GET['skin'] ?? ($_GET['route'] ?? ''));
+
+if ($skinParam === '' && $API_KEY !== '' && !isset($_GET['asset'])) {
+    $byKey = msapi_skin_for_key($API_KEY);
+    if ($byKey !== null && msapi_skin($byKey)) $skinParam = $byKey;
+}
+if ($skinParam === '') $skinParam = msapi_default_skin();
+
+$skin = msapi_skin($skinParam);
+if (!$skin) {
+    // 按 key 解析出的皮肤可能已被删除：回落默认皮肤，而不是让整个嵌入站报错
+    error_log('[msapi] unknown skin "' . $skinParam . '"，回落默认皮肤');
+    $skin = msapi_skin(msapi_default_skin());
+    if (!$skin) msapi_send_error('No skin available', 500);
+}
+$SKIN_NAME = $skin['name'];
+$route     = $SKIN_NAME;   // 后续（单体分支 / 模块 URL）沿用
 
 // ═══ 模块资源输出: 经 PHP 读出并做 ETag 校验 ═══
 if (isset($_GET['asset'])) {
-    $asset    = basename((string)$_GET['asset']);   // basename 防目录穿越
-    $allowed  = ['auth.js', 'widget.js', 'state.js', 'player.js', 'ui.js', 'drag.js', 'immersive.js', 'lyrics.js', 'theme.js', 'embed.js'];
-    $assetAbs = dirname(__DIR__) . '/' . $MODULE_DIR . $asset;
-
-    if (!in_array($asset, $allowed, true) || !is_file($assetAbs)) {
+    $asset = basename((string)$_GET['asset']);   // basename 防目录穿越
+    // 白名单来自清单（内核清单 ∪ 皮肤清单），不再硬编码文件名数组
+    if ($SKIN_NAME === '' || !in_array($asset, msapi_skin_assets($SKIN_NAME), true)) {
+        msapi_send_error('module not found: ' . $asset);
+    }
+    // 解析顺序：皮肤目录优先（同名可覆盖引擎），找不到再落到 modules/core/
+    $root     = __DIR__;
+    $assetAbs = $root . '/modules/' . $SKIN_NAME . '/' . $asset;
+    if (!is_file($assetAbs)) $assetAbs = $root . '/modules/core/' . $asset;
+    if (!is_file($assetAbs)) {
         msapi_send_error('module not found: ' . $asset);
     }
     msapi_send_js((string)file_get_contents($assetAbs), (int)filemtime($assetAbs));
 }
 
 // compute site root URL (strip subdirectories so _SCRIPT_BASE points to root)
+// 注意：不能用 dirname() —— Windows 上 dirname('/api.php') 返回的是反斜杠 "\"，
+// 会让 _SCRIPT_BASE 变成 https://msapi\/ 并拼出 https://msapi//api.php 这种双斜杠地址。
+$selfDir = preg_replace('#/[^/]*$#', '', (string)($_SERVER['SCRIPT_NAME'] ?? '/api.php'));
 $script_base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
     . '://' . $_SERVER['HTTP_HOST']
-    . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') . '/';
+    . rtrim($selfDir, '/') . '/';
 $script_base = preg_replace('#/modules/$#', '/', $script_base);
 
 // 本文件相对站点根目录的路径（兼容子目录部署），用于把模块请求也导回本文件
@@ -70,8 +144,8 @@ $selfRel  = ltrim(substr((string)$_SERVER['SCRIPT_NAME'], strlen($basePath)), '/
 // legacy-compat: embed.js variants served via GET param (e.g. api.php?embed=1)
 $embed_mode = isset($_GET['embed']);
 
-// ═══ Chiropractic 路由：直接加载单体 embed.js（非模块化） ═══
-if ($route === 'chiropractic') {
+// ═══ 单体皮肤（mode=monolith）：直接加载它的入口文件，不走模块机制 ═══
+if ($skin && $skin['mode'] === 'monolith') {
     $chiropractic_wrapper = <<<'JS'
 (function(){
 'use strict';
@@ -93,7 +167,7 @@ if (cur) {
 document.head.appendChild(s);
 })();
 JS;
-    msapi_send_js(str_replace('_PHP_EMBED_SRC_', json_encode($script_base . $selfRel . '?route=chiropractic&asset=embed.js'), $chiropractic_wrapper));
+    msapi_send_js(str_replace('_PHP_EMBED_SRC_', json_encode($script_base . $selfRel . '?route=' . rawurlencode($skin['name']) . '&asset=' . rawurlencode($skin['entry'])), $chiropractic_wrapper));
 }
 
 // ═══ Router 路由：模块化播放器启动脚本 ═══
@@ -103,21 +177,60 @@ $router_js = <<<'JS'
 (function(){
     'use strict';
 
-    // ═══ 幂等启动: 同一页面重复加载脚本时, 先让上一个实例失效并清理残留 DOM ═══
+    // ═══ 实例身份（必须最先算，且只依赖本脚本自身的属性） ═══
+    // swup / Pjax / Turbo 这类无刷新换页框架会重执行 head 里的脚本。
+    // 因此身份绝不能依赖"它是第几个 route=router 脚本"——模块脚本自身的 URL 也含 route=router，
+    // 重执行时匹配数量必然变化，算出的 ID 每次都不同，去重随即失效（表现为两个播放器同时出声）。
+    var _selfTag = document.currentScript;
+
+    // 配置来源：优先标签属性（旧写法 key="..."），其次脚本 URL 的查询参数（新写法 /api.php?key=xxx）。
+    // 转发壳会把旧标签上的属性原样搬进查询参数，所以两种写法都能读到同样的值。
+    var _qs = null;
+    try { _qs = (_selfTag && _selfTag.src) ? new URL(_selfTag.src, location.href).searchParams : null; } catch(e) { _qs = null; }
+    function _param(name) { try { return _qs ? (_qs.get(name) || '') : ''; } catch(e) { return ''; } }
+    function _attr(name, alt) {
+        if (!_selfTag) return '';
+        var v = _selfTag.getAttribute(name) || (alt ? (_selfTag.getAttribute(alt) || '') : '');
+        return v || _param(name);
+    }
+
+    function _hash36(s) {
+        var h = 5381;
+        for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+        return (h >>> 0).toString(36);
+    }
+
+    // 显式 data-player-id / player-id / id 优先; 否则由 key + api 端点派生稳定键
+    // (同一份配置 → 同一个键; 作者显式给 id 才能同页跑两个"同配置"播放器)
+    var EXPLICIT_ID = String(_attr('data-player-id', 'player-id') || (_selfTag && _selfTag.id) || '')
+        .replace(/[^A-Za-z0-9_-]/g, '');
+    var DEDUP_KEY = EXPLICIT_ID
+        ? 'id:' + EXPLICIT_ID
+        : 'k:' + _hash36(_attr('key') + '\u0000' + _attr('api'));
+
+    var _ALREADY_BOOTED = false;
+
+    // ═══ 幂等启动: 同一播放器被重复执行时不得重建 ═══
+    // 还活着 → 本次执行整体退出（播放不中断，这是换页框架下的正确行为）;
+    // 已是僵尸（宿主被移除 / 启动失败）→ 才销毁重建。不同播放器（不同 DEDUP_KEY）互不影响。
     (function(){
         var all = window.__mapiPlayers || [];
         for (var i = all.length - 1; i >= 0; i--) {
-            if ((all[i]._.INSTANCE_ID || '') !== INSTANCE_ID) continue;   // 别的实例不动
-            var prev = all[i];
+            var inst = all[i];
+            if (!inst || !inst._ || inst._.DEDUP_KEY !== DEDUP_KEY) continue;   // 别的播放器不动
+            var host = inst._hostRoot && inst._hostRoot.host;
+            if (!inst._destroyed && !inst._bootFailed && host && host.isConnected) {
+                _ALREADY_BOOTED = true;
+                return;
+            }
             all.splice(i, 1);
-            try { prev._destroyed = true; } catch(e) {}
-            if (typeof prev.destroy === 'function') { try { prev.destroy(); } catch(e) {} }
-            try {
-                var host = prev._hostRoot && prev._hostRoot.host;
-                if (host && host.parentNode) host.parentNode.removeChild(host);
-            } catch(e) {}
+            try { inst._destroyed = true; } catch(e) {}
+            if (typeof inst.destroy === 'function') { try { inst.destroy(); } catch(e) {} }
+            try { if (host && host.parentNode) host.parentNode.removeChild(host); } catch(e) {}
         }
     })();
+
+    if (_ALREADY_BOOTED) return;   // 同一个播放器已在运行: 静默退出, 不重复建 UI / 不重复起音频
 
     // ═══ 强制 UTF-8 编码 ═══
     (function(){
@@ -126,47 +239,43 @@ $router_js = <<<'JS'
         document.head.appendChild(m);
     })();
 
-    // ═══ 禁用宿主页面滚动条 ═══
-    (function(){
-        var s = document.createElement('style');
-        s.id = 'mapi-scrollbar-style';
-        s.textContent = 'html::-webkit-scrollbar{display:none}body::-webkit-scrollbar{display:none}html{scrollbar-width:none}body{scrollbar-width:none}';
-        document.head.appendChild(s);
-    })();
+    // ═══ 不再改动宿主页面的滚动条 ═══
+    // 旧版本会往宿主页 head 注入 `html::-webkit-scrollbar{display:none}` + `scrollbar-width:none`，
+    // 这会强行改掉整站外观，并与 OverlayScrollbars 之类的主题滚动条方案互相干扰。
+    // 播放器自身的滚动区域都在 closed shadow root 内，样式已在组件内部处理，无需污染宿主页面。
 
     // ═══ 站点根路径（PHP 注入，避免因 api.php 位于子目录导致路径偏移） ═══
     var _SCRIPT_BASE = _PHP_SCRIPT_BASE_;
     var API_BASE = (function(){
-        var a = document.currentScript && document.currentScript.getAttribute('api');
+        var a = _attr('api');
         if (a) {
             if (/^https?:\/\//i.test(a)) return a.replace(/\/?$/, '/api.php');
             return _SCRIPT_BASE + a.replace(/\/?$/, '/api.php');
         }
         return _SCRIPT_BASE + 'admin/api/api.php';
     })();
-    var API_KEY = document.currentScript ? (document.currentScript.getAttribute('key') || '') : '';
-    var API_TOKEN = document.currentScript ? (document.currentScript.getAttribute('token') || '') : '';
+    var API_KEY = _attr('key');
+    var API_TOKEN = _attr('token');
+    // 显式指定的皮肤（?route=xxx）。要带给 get-config：位置是按皮肤存的，
+    // 不传的话「按 rose 渲染、却拿到 router 的位置」就会对不上。
+    var API_ROUTE = _attr('route');
 
-    // ═══ CDN 中继（支持外部覆盖） ═══
+    // ═══ APlayer 内核（默认自托管，支持外部覆盖） ═══
+    // 只加载 JS：APlayer 在这里仅作音频内核 —— 它的 UI 容器是 display:none、且位于 closed shadow root 内，
+    // 自带样式表（.aplayer*）既进不来也用不上，播放器界面全部是自己画的，所以不加载它的 CSS。
+    // 默认走本站自带文件而不依赖 jsDelivr：第三方 CDN 在部分网络下不可达时，
+    // 内核会永远停在加载态（按钮一直转圈），而且访客侧无从排查。
     var CDN = {
-        aplayer_css: (document.currentScript && document.currentScript.getAttribute('cdn-aplayer-css')) || 'https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.css',
-        aplayer_js:  (document.currentScript && document.currentScript.getAttribute('cdn-aplayer-js'))  || 'https://cdn.jsdelivr.net/npm/aplayer@1.10.1/dist/APlayer.min.js',
+        aplayer_js: _attr('cdn-aplayer-js') || _SCRIPT_BASE + 'assets/lib/aplayer/APlayer.min.js',
     };
 
     // ═══ Cookie 持久化 ═══
     function setCookie(n, v) { try { document.cookie = n + '=' + encodeURIComponent(v) + ';path=/;max-age=31536000;SameSite=Lax' + (location.protocol === 'https:' ? ';Secure' : ''); } catch(e) {} }
     function getCookie(n) { try { var m = document.cookie.match('(^| )' + n + '=([^;]+)'); return m ? decodeURIComponent(m[2]) : ''; } catch(e) { return ''; } }
-    // 播放器实例标识：同页多个播放器各自独立记忆（脚本标签 data-player-id / id，缺省按脚本顺序编号）
-    var INSTANCE_ID = (function(){
-        var t = document.currentScript;
-        if (!t) return '';
-        var id = t.getAttribute('data-player-id') || t.getAttribute('player-id') || t.id || '';
-        if (id) return String(id).replace(/[^A-Za-z0-9_-]/g, '');
-        var list = document.querySelectorAll('script[src*="route=router"],script[src*="router/embed.js"]');
-        if (list.length <= 1) return '';
-        for (var i = 0; i < list.length; i++) { if (list[i] === t) return 'p' + (i + 1); }
-        return '';
-    })();
+    // 播放器实例标识：同页多个播放器各自独立记忆（Cookie 命名空间）
+    // 只认作者显式声明的 data-player-id / player-id / id，不再按"脚本顺序"编号——
+    // 模块脚本的 URL 同样含 route=router，顺序在重执行时必然漂移，编号会连累 Cookie 记忆错位
+    var INSTANCE_ID = EXPLICIT_ID;
 
     function delCookie(n) { try { document.cookie = n + '=;path=/;max-age=0'; } catch(e) {} }
 
@@ -200,6 +309,7 @@ $router_js = <<<'JS'
     MP._ = {
         SCRIPT_BASE: _SCRIPT_BASE,
         INSTANCE_ID: INSTANCE_ID,
+        DEDUP_KEY: DEDUP_KEY,
         API_BASE: API_BASE,
         API_KEY: API_KEY,
         API_TOKEN: API_TOKEN,
@@ -210,6 +320,9 @@ $router_js = <<<'JS'
         escapeHtml: escapeHtml,
         fmt: fmt,
     };
+    // 皮肤模块以自己的 IIFE 接入：(function(MP){ ... })(window.MP)
+    // 所以命名空间必须挂到全局，否则皮肤代码会整段空跑（宿主建不出来）。
+    window.MP = MP;
 
     // ═══ 脚本加载器（标记为播放器资源，卸载时统一清理，避免 head 无限增长） ═══
     function loadScript(url, isAsset) {
@@ -237,21 +350,15 @@ _PHP_MODULES_
     }
 
     // ═══ 启动 ═══
-    var _selfTag = document.currentScript;
     function _bootAlive() {
         if (MP._destroyed) return false;
         if (_selfTag && !_selfTag.parentNode) return false;
         return true;
     }
 
-    // Inject APlayer CSS（重复加载时复用同一个 link，不重复插入）
-    if (!document.getElementById('mapi-aplayer-css')) {
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.id = 'mapi-aplayer-css';
-        link.href = CDN.aplayer_css;
-        document.head.appendChild(link);
-    }
+    // 注：这里刻意不注入 APlayer 自带样式表。
+    // 它只在「把 APlayer 原生 UI 显示出来」时才有意义，而本项目的界面完全自绘 ——
+    // 注进去只会让宿主博客多一个「跨域 + 阻塞渲染」的第三方请求。
 
     // 多实例：模块加载期间 window.__mapiPlayer 必须指向本实例，故各实例启动串行
     window.__mapiBootChain = (window.__mapiBootChain || Promise.resolve()).then(function(){
@@ -268,11 +375,11 @@ _PHP_MODULES_
             MP.showConsentBanner(function(consented) {
                 if (!_bootAlive()) return;
                 MP._cookieConsented = consented;
-                MP.loadCSS(function() {
+                (MP.loadCSS || function (cb) { cb(); })(function() {
                     if (!_bootAlive()) return;
                     var _bootXhr = new XMLHttpRequest();
                     MP._bootXhr = _bootXhr;
-                    _bootXhr.open('GET', API_BASE + '?action=get-config&token=' + encodeURIComponent(API_TOKEN || API_KEY), true);
+                    _bootXhr.open('GET', API_BASE + '?action=get-config&token=' + encodeURIComponent(API_TOKEN || API_KEY) + (API_ROUTE ? '&route=' + encodeURIComponent(API_ROUTE) : ''), true);
                     _bootXhr.timeout = 20000;
                     _bootXhr.ontimeout = function() {
                         MP._bootFailed = true;                 // 配置请求超时：播放器无法启动
@@ -355,11 +462,12 @@ _PHP_MODULES_
 })();
 JS;
 
-// 模块清单：统一经本文件输出（no-store 强制不缓存），因此不再需要 ?v= 版本号
-$moduleFiles = ['auth.js', 'widget.js', 'state.js', 'player.js', 'ui.js', 'drag.js', 'immersive.js', 'lyrics.js', 'theme.js'];
+// 模块清单 = 引擎（core.json 声明，顺序固定）+ 皮肤（skin.json 声明）。
+// 统一经本文件输出（no-store 强制不缓存），因此不再需要 ?v= 版本号。
+$moduleFiles = array_merge(msapi_core()['modules'], $skin['modules']);
 $moduleLines = [];
 foreach ($moduleFiles as $mf) {
-    $moduleLines[] = "        '" . $selfRel . '?route=' . rawurlencode($route) . '&asset=' . $mf . "',";
+    $moduleLines[] = "        '" . $selfRel . '?skin=' . rawurlencode($SKIN_NAME) . '&asset=' . $mf . "',";
 }
 $esc_modules = implode("\n", $moduleLines);
 

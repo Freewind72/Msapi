@@ -1,4 +1,4 @@
-<?php defined('MAPI_ADMIN') or die('禁止直接访问');
+﻿<?php defined('MAPI_ADMIN') or die('禁止直接访问');
 $csrf = csrf_token();
 
 // 密钥列表（含用户信息）
@@ -68,24 +68,44 @@ if (!empty($keys)) {
       <input type="checkbox" name="autoplay_default" value="1"<?= $autoplayDefault ? ' checked' : '' ?>>
       自动播放
     </label>
-    <div style="padding:10px 0 12px;font-size:13px;color:rgba(0,0,0,.5)">
-      <div style="margin-bottom:8px;font-weight:600">播放器初始位置（访客首次打开时出现的位置）</div>
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <label class="form-radio">
-          <input type="radio" name="player_pos_side" value="right"<?= $playerPosSide === 'right' ? ' checked' : '' ?>>
-          靠右
-        </label>
-        <label class="form-radio">
-          <input type="radio" name="player_pos_side" value="left"<?= $playerPosSide === 'left' ? ' checked' : '' ?>>
-          靠左
-        </label>
-        <label style="display:flex;align-items:center;gap:6px">
-          垂直位置
-          <input type="number" name="player_pos_y" min="5" max="95" step="1" value="<?= (int)$playerPosY ?>" style="width:70px;padding:4px 6px;border-radius:6px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.6)">
-          <span>%（0=最上，100=最下；默认 88）</span>
-        </label>
+    <?php /* 初始位置已并入下面的「播放器皮肤」——每个皮肤各自记住自己的位置，不再全局共用一份 */ ?>
+    <div style="padding:2px 0 12px;font-size:13px;color:rgba(0,0,0,.5)">
+      <div style="margin-bottom:8px;font-weight:600">播放器皮肤<span style="margin-left:6px;font-weight:400;font-size:12px;color:rgba(0,0,0,.42)">（该功能还在内测中）</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <?php require_once __DIR__ . '/../../modules/registry.php';
+        foreach (msapi_skins() as $sk):
+          if (!empty($sk['hidden'])) continue;
+          $on = ($playerSkin === $sk['name']);
+          $skPos = skin_pos_of($playerSkinCfg, $sk['name'], $playerPos);
+          list($skSide, $skY) = explode(':', $skPos);
+          $skId = 'skin_' . preg_replace('/[^a-z0-9_]/i', '', $sk['name']); ?>
+          <div data-skin-card data-skin="<?= $skId ?>"
+               style="flex:1 1 250px;min-width:230px;cursor:pointer;border:1px solid <?= $on ? 'rgba(108,92,231,.85)' : 'rgba(128,128,128,.35)' ?>;background:<?= $on ? 'rgba(108,92,231,.10)' : 'transparent' ?>;border-radius:10px;padding:10px 12px">
+            <input type="radio" id="<?= $skId ?>" name="player_skin" value="<?= htmlspecialchars($sk['name']) ?>"<?= $on ? ' checked' : '' ?>
+                   style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
+            <div style="display:flex;align-items:center;gap:6px">
+              <strong style="font-size:13px"><?= htmlspecialchars($sk['displayName']) ?></strong>
+              <code style="font-size:11px;color:var(--ink-soft,rgba(128,128,128,.75))"><?= htmlspecialchars($sk['name']) ?></code>
+            </div>
+            <div style="margin-top:4px;font-size:12px;line-height:1.6;color:var(--ink-dim,rgba(128,128,128,.9))"><?= htmlspecialchars($sk['description']) ?></div>
+            <div class="rs-pos-zone" style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(128,128,128,.35);font-size:12px">
+              <div style="margin-bottom:4px;color:var(--ink-dim,rgba(128,128,128,.9))">初始位置（访客首次打开）</div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="pos_side_<?= htmlspecialchars($sk['name']) ?>" value="right"<?= $skSide === 'right' ? ' checked' : '' ?>>靠右</label>
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="pos_side_<?= htmlspecialchars($sk['name']) ?>" value="left"<?= $skSide === 'left' ? ' checked' : '' ?>>靠左</label>
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer">垂直
+                  <input type="number" name="pos_y_<?= htmlspecialchars($sk['name']) ?>" min="0" max="100" step="1" value="<?= (int)$skY ?>"
+                         style="width:64px;padding:3px 6px;border-radius:6px;border:1px solid var(--input-bd,rgba(128,128,128,.4));background:var(--input-bg,transparent);color:var(--ink,inherit)">
+                </label>
+              </div>
+              <div style="margin-top:4px;color:var(--ink-soft,rgba(128,128,128,.75))">0 = 最上，100 = 最下</div>
+            </div>
+          </div>
+        <?php endforeach; ?>
       </div>
-      <div style="margin-top:6px;font-size:12px;color:rgba(0,0,0,.35)">访客自己拖动过播放器后以他的位置为准；保存这里会清掉你自己浏览器里的位置记忆，方便立刻预览。</div>
+      <div style="margin-top:6px;font-size:12px;color:var(--ink-soft,rgba(128,128,128,.75))">
+        选中的皮肤对本账号下所有密钥生效；<strong>每个皮肤各自记住自己的初始位置</strong>。
+      </div>
     </div>
     <button class="btn btn-primary btn-block" style="margin-top:8px">保存</button>
   </form>

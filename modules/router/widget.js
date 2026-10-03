@@ -18,6 +18,11 @@ MP._css = '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-colo
 '[data-mp="panel"]{position:relative;background:rgba(255,255,255,.36);backdrop-filter:blur(24px) saturate(200%);border:1px solid rgba(255,255,255,.7);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.12);width:320px;margin-bottom:30px;padding:16px;transform:translateY(20px) scale(.95);opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.34,1.56,.64,1);transform-origin:bottom right}'+
 '[data-mp="panel"]:not(.open){visibility:hidden;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'+
 '[data-mp="panel"].open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto;visibility:visible}'+
+// 顶部停靠（PC）：圆形按钮翻到宿主上沿、面板改为向下浮出，收起动画方向同步翻转。
+// 按钮定位从 bottom:-28px 换成 top:-28px，面板外边距从下边换到上边，保证「按钮 → 面板」的间距不变。
+'[data-mp="root"][data-dock="top"] [data-mp="toggle"]{bottom:auto;top:-28px}'+
+'[data-mp="root"][data-dock="top"] [data-mp="panel"]{margin-bottom:0;margin-top:30px}'+
+'[data-mp="root"][data-dock="top"] [data-mp="panel"]:not(.open){transform:translateY(-20px) scale(.95)}'+
 '.info{display:flex;align-items:center;gap:12px;margin-bottom:12px}'+
 '.cover{width:48px;height:48px;border-radius:10px;background:rgba(0,0,0,.05);flex-shrink:0;overflow:hidden}'+
 '.cover img{width:100%;height:100%;object-fit:cover}'+
@@ -316,7 +321,7 @@ MP._css +=
   + '<div class="mvol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"\/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"\/><\/svg>'
   + '<input type="range" data-mp="vol" min="0" max="1" step="0.05" value="1"><button class="b-btn" data-mp="boost">\u589e\u5f3a<\/button><\/div>'
   + '<div class="songlist" data-mp="slist"><button class="pl-back" data-mp="plBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"\/><\/svg>\u8fd4\u56de\u6b4c\u5355\u5217\u8868<\/button><div data-mp="slistInner"><\/div><\/div><\/div>'
-  + '<button data-mp="toggle"><svg data-mp="toggleSvg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"\/><circle cx="6" cy="18" r="3"\/><circle cx="18" cy="16" r="3"\/><\/svg><img data-mp="toggleCover" src="" alt="" style="display:none;position:absolute;top:3px;left:3px;width:calc(100% - 6px);height:calc(100% - 6px);border-radius:50%;object-fit:cover;box-sizing:border-box"><span data-mp="toggleLoading" style="position:absolute;inset:2px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:rgba(0,0,0,.5);opacity:0;transition:opacity .3s"><\/span><\/button>'
+  + '<button data-mp="toggle" draggable="false"><svg data-mp="toggleSvg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"\/><circle cx="6" cy="18" r="3"\/><circle cx="18" cy="16" r="3"\/><\/svg><img data-mp="toggleCover" draggable="false" src="" alt="" style="display:none;position:absolute;top:3px;left:3px;width:calc(100% - 6px);height:calc(100% - 6px);border-radius:50%;object-fit:cover;box-sizing:border-box"><span data-mp="toggleLoading" style="position:absolute;inset:2px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:rgba(0,0,0,.5);opacity:0;transition:opacity .3s"><\/span><\/button>'
   + '<div data-mp="apContainer" style="display:none"><\/div>'
   + '<div data-mp="immersiveOverlay"><div class="im-close-area"><button class="im-close-btn" data-mp="imClose"><svg viewBox="0 0 1024 1024" width="18" height="18" fill="currentColor"><path d="M384 128h-85.33v170.67H128V384h256zM896 384v-85.33H725.33V128H640v256zM725.33 725.33H896V640H640v256h85.33zM298.67 896H384V640H128v85.33h170.67z"\/><\/svg><\/button><\/div>'
   + '<div class="im-content" data-mp="imContent"><div class="im-cover-wrap"><img class="im-cover" data-mp="imCover" src="" alt=""><\/div>'

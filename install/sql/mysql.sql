@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS `mapi_users` (
     `lyrics_default` TINYINT DEFAULT 1,
     `autoplay_default` TINYINT DEFAULT 0,
     `player_pos` VARCHAR(24) DEFAULT '',
+    `player_skin` VARCHAR(32) DEFAULT '',
+    `player_skin_cfg` VARCHAR(1000) DEFAULT '{"rose":{"pos":"left:88"},"router":{"pos":"right:80"}}',
     `background` VARCHAR(500) DEFAULT '',
     `background_url` VARCHAR(500) DEFAULT '',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,

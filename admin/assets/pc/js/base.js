@@ -1,4 +1,4 @@
-var _toast=document.getElementById('toast'),_tt=null;
+﻿var _toast=document.getElementById('toast'),_tt=null;
 function showToast(m,t){_toast.textContent=m;_toast.className='show '+(t||'ok');clearTimeout(_tt);_tt=setTimeout(function(){_toast.className=''},2500)}
 function showConfirm(e,f,m){e.preventDefault();if(!confirm(m))return false;f.submit();return false}
 
@@ -49,12 +49,42 @@ function loadPageScripts(src,cb){
   s.onerror=cb;document.body.appendChild(s);
 }
 
-function runPageScripts(scope){
+  // 皮肤卡片：事件委托挂在 document 上。
+  // 后台换页 / 保存都会替换页面内容，内联脚本与逐元素绑定都会随之失效（这个 bug 已复发多次），
+  // 而 document 不会被替换 —— 委托一次，永久有效。位置控件区 .rs-pos-zone 不参与选中。
+  if(!window.__skinCardDelegated){
+    window.__skinCardDelegated=1;
+    document.addEventListener('click',function(e){
+      var t=e.target;
+      if(!t||!t.closest)return;
+      if(t.closest('.rs-pos-zone'))return;
+      var card=t.closest('[data-skin-card]');
+      if(!card)return;
+      var id=card.getAttribute('data-skin');
+      var radio=document.getElementById(id);
+      if(radio)radio.checked=true;
+      var cards=document.querySelectorAll('[data-skin-card]');
+      for(var i=0;i<cards.length;i++){
+        var on=(cards[i].getAttribute('data-skin')===id);
+        cards[i].style.borderColor=on?'rgba(108,92,231,.85)':'rgba(128,128,128,.35)';
+        cards[i].style.background=on?'rgba(108,92,231,.10)':'transparent';
+      }
+    });
+  }function runPageScripts(scope){
   scope.querySelectorAll('script').forEach(function(s){
     if(!s.textContent.trim())return;
     var m=s.textContent.match(/showToast\('((?:[^'\\]|\\.)*)','((?:[^'\\]|\\.)*)'/);
     if(m){showToast(m[1],m[2]);return}
-    try{new Function(s.textContent)()}catch(e){console.warn('[navigateTo] 页面内联脚本执行失败:',e)}
+    try{
+      // 用真实 <script> 元素执行。不能用 new Function(code)()：
+      // 那是把代码当函数体跑，页面里的 function xxx(){} 只会成为那个包装函数的局部函数，
+      // 不会挂到 window —— 于是 onclick="xxx()" 报未定义、typeof xxx==='function' 恒为 false。
+      // （症状：无刷新切到该页面时按钮点不动，刷新后才正常。）
+      var el=document.createElement('script');
+      el.textContent=s.textContent;
+      (document.head||document.body).appendChild(el);
+      if(el.parentNode)el.parentNode.removeChild(el);
+    }catch(e){console.warn('[navigateTo] 页面内联脚本执行失败:',e)}
   });
   try{if(typeof updateTestPlayerButtons==='function')updateTestPlayerButtons()}catch(e){}
   try{if(typeof initDebugExpand==='function')initDebugExpand()}catch(e){}
@@ -211,7 +241,7 @@ window.addEventListener('popstate',function(){
 })();
 
 function copyEmbedKey(key){
-  var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/modules/api.php?route=router')+'" key="'+key+'"><\/script>';
+  var code='<script src="'+window.location.origin+(window.RELAY&&window.RELAY.embed_js||'/api.php')+'?key='+encodeURIComponent(key)+'" defer><\/script>';
   navigator.clipboard.writeText(code);
 }
 

@@ -1,0 +1,9 @@
+{
+  "name": "rose",
+  "displayName": "玫瑰玻璃",
+  "description": "侧边常驻卡片，玫瑰渐变玻璃质感；不可拖动，只贴左右边，点贴边箭头收起/展开，自带歌单列表",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "mode": "modules",
+  "modules": ["widget.js", "skin.js"]
+}

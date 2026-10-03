@@ -6,6 +6,11 @@ if ($embedJs && $embedJs[0] === '/') {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $embedJs = $scheme . '://' . $_SERVER['HTTP_HOST'] . $embedJs;
 }
+// 新入口按 key 解析皮肤（key → 用户 → player_skin）。
+// 本站首页带主密钥，落地页展示的就是后台当前配置的那套皮肤。
+if (!empty($superKey)) {
+    $embedJs .= (strpos($embedJs, '?') !== false ? '&' : '?') . 'key=' . rawurlencode((string)$superKey);
+}
 ?>
 <script>
 (function(){

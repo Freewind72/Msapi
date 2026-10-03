@@ -405,10 +405,11 @@ switch ($action) {
         $themeMode = $userRow ? $userRow['theme_mode'] : 'light';
         $lyricsDefault = $userRow ? (int)($userRow['lyrics_default'] ?? 1) : 1;
         $autoplayDefault = $userRow ? (int)($userRow['autoplay_default'] ?? 0) : 0;
-        // 播放器首次加载位置（side:pct）；老库没这列时用内置默认
+        // 播放器首次加载位置（side:pct）：优先取【当前皮肤】的专属配置，其次老的全局列。
+        // 老库没有新列时 prepare 会失败 → 落到 catch → 天然向后兼容。
         $playerPos = 'right:88';
         try {
-            $posStmt = $db_log->prepare("SELECT player_pos FROM mapi_users WHERE id=?");
+            $posStmt = $db_log->prepare("SELECT player_pos, player_skin, player_skin_cfg FROM mapi_users WHERE id=?");
             if ($posStmt) {
                 $posStmt->bind_param('i', $userId);
                 $posStmt->execute();
@@ -416,8 +417,21 @@ switch ($action) {
                 $posRow = $posRes ? $posRes->fetch_assoc() : null;
                 $cand = trim((string)($posRow['player_pos'] ?? ''));
                 if (preg_match('/^(left|right):\d{1,3}$/', $cand)) $playerPos = $cand;
+                // 皮肤级覆盖：{"router":{"pos":"left:80"},"rose":{"pos":"right:88"}}
+                // 皮肤来源：嵌入方显式指定的 ?route= 优先（前端启动脚本会带上），
+                // 否则用密钥归属用户配置的皮肤 —— 位置必须与真正渲染的那套皮肤对应。
+                $curSkin = '';
+                $rqSkin = (string)($_GET['route'] ?? '');
+                if ($rqSkin !== '' && preg_match('/^[a-z0-9][a-z0-9-]{0,31}$/', $rqSkin)) $curSkin = $rqSkin;
+                if ($curSkin === '') $curSkin = trim((string)($posRow['player_skin'] ?? ''));
+                if ($curSkin === '') $curSkin = 'router';
+                $skinMap = json_decode((string)($posRow['player_skin_cfg'] ?? ''), true);
+                if (is_array($skinMap)) {
+                    $skinPos = trim((string)($skinMap[$curSkin]['pos'] ?? ''));
+                    if (preg_match('/^(left|right):\d{1,3}$/', $skinPos)) $playerPos = $skinPos;
+                }
             }
-        } catch (Throwable $e) { /* 列不存在：用默认 */ }
+        } catch (Throwable $e) { /* 新列不存在：用默认 / 老列 */ }
         $keyId = (int)$keyRow['id'];
         $playlists = [];
         if ($db_log) {

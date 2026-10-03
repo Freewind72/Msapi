@@ -1073,6 +1073,8 @@
             MP._posBottom = bottomPx;
         }
         MP._side = side;
+        // 停靠方向：访客拖过竖直位置的按落点推断（_snap 会自己判定），后台百分比位置一律底部停靠
+        MP._dockTop = (mem && mem.top) ? undefined : false;
         var root = MP.$('root');
         if (root) root.style.alignItems = side === 'left' ? 'flex-start' : 'flex-end';
         var tog = MP.$('toggle');
@@ -1080,8 +1082,7 @@
             tog.style.left = side === 'left' ? '' : 'auto';
             tog.style.right = side === 'left' ? 'auto' : '';
         }
-        var pnl = MP.$('panel');
-        if (pnl) pnl.transformOrigin = 'bottom ' + (side === 'left' ? 'left' : 'right');
+        if (typeof MP._applyDock === 'function') MP._applyDock(false);
         MP._updateToggleTransform();
         if (typeof MP._snap === 'function') MP._snap();
         return true;
@@ -1312,6 +1313,7 @@
         }
 
         MP.enableDrag();
+        if (typeof MP.enableResizeGuard === 'function') MP.enableResizeGuard();
     };
 
     MP.onEnded = function() {

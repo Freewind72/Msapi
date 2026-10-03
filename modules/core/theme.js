@@ -138,10 +138,6 @@
             + '<button id="mapi-ann-ok" class="mapi-ann-btn" style="width:100px;height:32px;border-radius:8px;border:1px solid ' + boxBor + ';background:rgba(255,255,255,.2);backdrop-filter:blur(8px)saturate(200%);cursor:pointer;font-size:13px;font-weight:600;color:' + tCol + ';padding:0;outline:none">\u77e5\u9053\u4e86</button></div>'
             + '</div>';
         document.body.appendChild(wrap);
-        var lockStyle = document.createElement('style');
-        lockStyle.id = 'mapi-ann-scroll-lock';
-        lockStyle.textContent = 'html,body{overflow:hidden!important}';
-        document.head.appendChild(lockStyle);
         void wrap.offsetWidth;
         wrap.style.opacity = '1';
         wrap.style.visibility = 'visible';
@@ -150,8 +146,6 @@
             wrap.style.visibility = 'hidden';
             setTimeout(function(){
                 if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-                var ls = document.getElementById('mapi-ann-scroll-lock');
-                if (ls) ls.remove();
             }, 400);
         });
         document.getElementById('mapi-ann-ok').addEventListener('click', function() {
@@ -160,8 +154,6 @@
             wrap.style.visibility = 'hidden';
             setTimeout(function(){
                 if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-                var ls = document.getElementById('mapi-ann-scroll-lock');
-                if (ls) ls.remove();
             }, 400);
         });
     };

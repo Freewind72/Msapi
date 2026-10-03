@@ -15,6 +15,21 @@ $autoplayDefault = (int)($_SESSION['admin_autoplay_default'] ?? 0);
 $playerPos = trim((string)($_SESSION['admin_player_pos'] ?? ''));
 if (!preg_match('/^(left|right):\d{1,3}$/', $playerPos)) $playerPos = 'right:88';
 list($playerPosSide, $playerPosY) = explode(':', $playerPos);
+// 播放器皮肤（modules/<skin>/skin.json 的目录名）；空值回落默认皮肤
+$playerSkin = trim((string)($_SESSION['admin_player_skin'] ?? ''));
+if ($playerSkin === '') $playerSkin = 'router';
+// 皮肤级配置：{皮肤名: {pos: "left:80"}}。位置从全局设置搬进了皮肤里，各皮肤互不影响。
+$playerSkinCfg = [];
+$rawSkinCfg = (string)($_SESSION['admin_player_skin_cfg'] ?? '');
+if ($rawSkinCfg !== '') {
+    $decoded = json_decode($rawSkinCfg, true);
+    if (is_array($decoded)) $playerSkinCfg = $decoded;
+}
+/** 取某个皮肤的初始位置；没单独配过就回落到全局设置（老数据平滑过渡） */
+function skin_pos_of(array $cfg, string $skin, string $fallback): string {
+    $p = trim((string)($cfg[$skin]['pos'] ?? ''));
+    return preg_match('/^(left|right):\d{1,3}$/', $p) ? $p : $fallback;
+}
 $isAdmin = $_SESSION['admin_is_admin'] ?? 99;
 
 // Pusher 上线通知
